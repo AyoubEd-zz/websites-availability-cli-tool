@@ -1,0 +1,14 @@
+[
+  {
+    "url": "https://google.com/",
+    "checkInterval": 4000
+  },
+  {
+    "url": "https://wwww.reddit.com",
+    "checkInterval": 9000
+  },
+  {
+    "url": "https://wwww.facebook.com",
+    "checkInterval": 19000
+  }
+]
