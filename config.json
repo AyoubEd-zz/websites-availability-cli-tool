@@ -5,6 +5,10 @@
   },
   {
     "url": "https://wwww.reddit.com",
-    "checkInterval": 8005
+    "checkInterval": 9000
+  },
+  {
+    "url": "https://wwww.facebook.com",
+    "checkInterval": 19000
   }
 ]
