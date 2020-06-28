@@ -10,12 +10,15 @@ import (
 )
 
 type WebsiteStat struct {
+	numberOfLogs       int64
 	availability       int
 	responseCodeCount  map[int]int
-	avgResponseTime    time.Duration
+	avgResponseTime    int64
 	maxResponseTime    time.Duration
-	avgTimeToFirstByte time.Duration
+	sumResponseTime    time.Duration
+	avgTimeToFirstByte int64
 	maxTimeToFirstByte time.Duration
+	sumTimeToFirstByte time.Duration
 }
 
 type websiteStatsQueue struct {
@@ -77,8 +80,32 @@ func sendUpdatedStats(ID int, q []request.ResponseLog, t time.Time, inter int64)
 	sort.Slice(sortedLogs, func(a, b int) bool {
 		return sortedLogs[a].Timestamp < sortedLogs[b].Timestamp
 	})
+
 	fmt.Println("[", ID, "]", t, "--------------------------------------------", inter)
+
+	mp := map[string]*WebsiteStat{}
 	for _, lg := range sortedLogs {
-		fmt.Println(time.Unix(lg.Timestamp, 0), lg.URL)
+		if v, ok := mp[lg.URL]; ok {
+			v.numberOfLogs++
+			if lg.TTFB > v.maxTimeToFirstByte {
+				v.maxTimeToFirstByte = lg.TTFB
+			}
+			if lg.LoadTime > v.maxResponseTime {
+				v.maxResponseTime = lg.LoadTime
+			}
+			v.responseCodeCount[lg.StatusCode]++
+
+			v.sumResponseTime += lg.LoadTime
+			v.avgResponseTime = int64(v.sumResponseTime) / v.numberOfLogs
+
+			v.sumTimeToFirstByte += lg.LoadTime
+			v.avgTimeToFirstByte = int64(v.sumResponseTime) / v.numberOfLogs
+		} else {
+			mp[lg.URL] = &WebsiteStat{1, 0, map[int]int{lg.StatusCode: 1}, lg.LoadTime.Milliseconds(), lg.LoadTime, lg.LoadTime, lg.TTFB.Milliseconds(), lg.TTFB, lg.TTFB}
+		}
+	}
+
+	for k, v := range mp {
+		fmt.Println(k, v)
 	}
 }
