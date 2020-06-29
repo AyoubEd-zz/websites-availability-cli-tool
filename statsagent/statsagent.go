@@ -1,7 +1,6 @@
 package statsagent
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -21,6 +20,11 @@ type WebsiteStat struct {
 	sumTimeToFirstByte time.Duration
 }
 
+type WebsiteStats struct {
+	ID    int
+	Stats map[string]*WebsiteStat
+}
+
 type websiteStatsQueue struct {
 	ID              int
 	refreshInterval int64
@@ -30,12 +34,12 @@ type websiteStatsQueue struct {
 }
 
 // ProcessLogs receives logs from the ping agent andf stores the latest logs in memory
-func ProcessLogs(logc chan request.ResponseLog, errc chan error) {
+func ProcessLogs(logc chan request.ResponseLog, statschan1, statschan2 chan WebsiteStats, errc chan error) {
 	done := make(chan bool, 1)
 
 	ws1, ws2 := websiteStatsQueue{ID: 1, refreshInterval: 60, displayInterval: 10, queue: []request.ResponseLog{}}, websiteStatsQueue{ID: 2, refreshInterval: 3600, displayInterval: 60, queue: []request.ResponseLog{}}
-	go ws1.removeOutdatedLogs(done, errc)
-	go ws2.removeOutdatedLogs(done, errc)
+	go ws1.removeOutdatedLogs(statschan1, done, errc)
+	go ws2.removeOutdatedLogs(statschan2, done, errc)
 	for log := range logc {
 		ws1.Add(log)
 		ws2.Add(log)
@@ -48,7 +52,7 @@ func (c *websiteStatsQueue) Add(log request.ResponseLog) {
 	c.queue = append(c.queue, log)
 }
 
-func (c *websiteStatsQueue) removeOutdatedLogs(done chan bool, errc chan error) {
+func (c *websiteStatsQueue) removeOutdatedLogs(statsc chan WebsiteStats, done chan bool, errc chan error) {
 	timer := time.NewTicker(time.Duration(10) * time.Second)
 	var ticks int64 = 0
 
@@ -65,7 +69,7 @@ func (c *websiteStatsQueue) removeOutdatedLogs(done chan bool, errc chan error) 
 			}
 			c.queue = newQueue
 			if (ticks*10)%c.displayInterval == 0 {
-				go sendUpdatedStats(c.ID, c.queue, t, c.refreshInterval/6)
+				go sendUpdatedStats(statsc, c.ID, c.queue, t, c.refreshInterval/6)
 			}
 			c.mux.Unlock()
 		case <-done:
@@ -75,13 +79,11 @@ func (c *websiteStatsQueue) removeOutdatedLogs(done chan bool, errc chan error) 
 	}
 }
 
-func sendUpdatedStats(ID int, q []request.ResponseLog, t time.Time, inter int64) {
+func sendUpdatedStats(statsc chan WebsiteStats, ID int, q []request.ResponseLog, t time.Time, inter int64) {
 	sortedLogs := q
 	sort.Slice(sortedLogs, func(a, b int) bool {
 		return sortedLogs[a].Timestamp < sortedLogs[b].Timestamp
 	})
-
-	fmt.Println("[", ID, "]", t, "--------------------------------------------", inter)
 
 	mp := map[string]*WebsiteStat{}
 	for _, lg := range sortedLogs {
@@ -105,7 +107,5 @@ func sendUpdatedStats(ID int, q []request.ResponseLog, t time.Time, inter int64)
 		}
 	}
 
-	for k, v := range mp {
-		fmt.Println(k, v)
-	}
+	statsc <- WebsiteStats{ID, mp}
 }

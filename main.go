@@ -24,7 +24,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := runMonitor(websites); err != nil {
+	statschan1 := make(chan statsagent.WebsiteStats)
+	statschan2 := make(chan statsagent.WebsiteStats)
+
+	if err := runMonitor(websites, statschan1, statschan2); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
 		os.Exit(1)
 	}
@@ -48,14 +51,14 @@ func getWebsitesConfig() ([]Website, error) {
 	return websites, nil
 }
 
-func runMonitor(websites []Website) error {
+func runMonitor(websites []Website, statsc1, statsc2 chan statsagent.WebsiteStats) error {
 	// Start goroutines to ping websites
 	done := make(chan bool, 1)
 	errc := make(chan error)
 	logc := make(chan request.ResponseLog)
 	defer close(done)
 
-	go statsagent.ProcessLogs(logc, errc)
+	go statsagent.ProcessLogs(logc, statsc1, statsc2, errc)
 
 	for _, ws := range websites {
 		go startTicker(ws, logc, done, errc)
