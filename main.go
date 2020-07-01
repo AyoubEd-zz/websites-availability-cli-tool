@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ayoubed/datadog-home-project/dashboard"
 	"github.com/ayoubed/datadog-home-project/database"
 	"github.com/ayoubed/datadog-home-project/request"
 )
@@ -37,8 +38,7 @@ func main() {
 		websiteList = append(websiteList, ws.URL)
 	}
 
-	go database.ReadLogsPeriodically(websiteList, 10, 60)
-	go database.ReadLogsPeriodically(websiteList, 60, 3600)
+	dashboard.Run(websiteList, 10, 60)
 
 	if err := runMonitor(config.Websites); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
