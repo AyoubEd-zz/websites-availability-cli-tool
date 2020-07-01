@@ -1,13 +1,20 @@
 package database
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
 	"time"
 
+	str2duration "github.com/xhit/go-str2duration"
+
 	"github.com/ayoubed/datadog-home-project/request"
 	"github.com/influxdata/influxdb/client/v2"
+)
+
+const (
+	layout string = "2006-01-02T15:04:05.000Z"
 )
 
 type InfluxDb struct {
@@ -105,20 +112,27 @@ func (influxDb InfluxDb) AddResponseLog(responseLog request.ResponseLog) error {
 }
 
 // GetRangeRecords gets the records for a particular range
-func (influxDb InfluxDb) GetRangeRecords(url string, span int) []interface{} {
+func (influxDb InfluxDb) GetRangeRecords(url string, span int) []request.ResponseLog {
 	q := fmt.Sprintf(`select * from "%s" WHERE time >= now() - %dm`, url, span/60)
 	res, err := queryDB(q, influxDb.DatabaseName)
 	if err != nil {
 		log.Printf("%v", err)
 	}
-	resSeries := make([]interface{}, 0)
+	s2dParser := str2duration.NewStr2DurationParser()
+
+	resSeries := make([]request.ResponseLog, 0)
 	for _, result := range res {
 		if len(result.Series) == 0 {
 			continue
 		}
 		for _, val := range result.Series[0].Values {
-
-			resSeries = append(resSeries, val)
+			timestamp, _ := time.Parse(layout, val[0].(string))
+			statusCode, _ := val[1].(json.Number).Int64()
+			url := val[2].(string)
+			responseTime, _ := s2dParser.Str2Duration(val[3].(string))
+			timeToFirstByte, _ := s2dParser.Str2Duration(val[4].(string))
+			item := request.ResponseLog{Timestamp: timestamp, StatusCode: int(statusCode), URL: url, TTFB: timeToFirstByte, LoadTime: responseTime}
+			resSeries = append(resSeries, item)
 		}
 	}
 	return resSeries
