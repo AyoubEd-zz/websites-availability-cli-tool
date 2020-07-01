@@ -1,7 +1,6 @@
 package request
 
 import (
-	"fmt"
 	"net/http"
 	"net/http/httptrace"
 
@@ -10,7 +9,7 @@ import (
 
 // ResponseLog represents the info we keep as log from the requests we issue
 type ResponseLog struct {
-	Timestamp  int64
+	Timestamp  time.Time
 	StatusCode int
 	URL        string
 	TTFB       time.Duration
@@ -39,9 +38,9 @@ func Send(t time.Time, url string, logc chan ResponseLog) error {
 
 	resp, err := http.DefaultTransport.RoundTrip(req)
 	if err != nil {
-		fmt.Println(err)
+		logc <- ResponseLog{t, 400, url, ttfb, time.Since(start)}
 	} else {
-		logc <- ResponseLog{start.Unix(), resp.StatusCode, url, ttfb, time.Since(start)}
+		logc <- ResponseLog{t, resp.StatusCode, url, ttfb, time.Since(start)}
 	}
 
 	return nil

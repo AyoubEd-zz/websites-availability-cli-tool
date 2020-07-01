@@ -1,14 +1,25 @@
-[
-  {
-    "url": "https://google.com/",
-    "checkInterval": 4000
+{
+  "database": {
+    "influxDb": {
+      "host": "localhost",
+      "port": 8086,
+      "databaseName": "httpmonitor",
+      "username": "",
+      "password": ""
+    }
   },
-  {
-    "url": "https://wwww.reddit.com",
-    "checkInterval": 9000
-  },
-  {
-    "url": "https://wwww.facebook.com",
-    "checkInterval": 19000
-  }
-]
+  "websites": [
+    {
+      "url": "https://google.com/",
+      "checkInterval": 4000
+    },
+    {
+      "url": "https://wwww.reddit.com",
+      "checkInterval": 9000
+    },
+    {
+      "url": "https://wwww.facebook.com",
+      "checkInterval": 19000
+    }
+  ]
+}
