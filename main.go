@@ -7,9 +7,15 @@ import (
 	"os"
 	"time"
 
+	"github.com/ayoubed/datadog-home-project/database"
 	"github.com/ayoubed/datadog-home-project/request"
 	"github.com/ayoubed/datadog-home-project/statsagent"
 )
+
+type Config struct {
+	Websites []Website     `json:"websites"`
+	Database database.Type `json:"database"`
+}
 
 // Website representes the entities we want to monitor
 type Website struct {
@@ -18,34 +24,47 @@ type Website struct {
 }
 
 func main() {
-	websites, err := getWebsitesConfig()
+	config, err := getConfig()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading website config: %v\n", err)
 		os.Exit(1)
 	}
 
-	if err := runMonitor(websites); err != nil {
+	database.Set(config.Database)
+
+	websiteList := []string{}
+	for _, ws := range config.Websites {
+		websiteList = append(websiteList, ws.URL)
+	}
+
+	go database.ReadLogsPeriodically(websiteList, 10, 60)
+	go database.ReadLogsPeriodically(websiteList, 60, 3600)
+
+	if err := runMonitor(config.Websites); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func getWebsitesConfig() ([]Website, error) {
+func getConfig() (Config, error) {
 	configFile, err := os.Open("config.json")
 	if err != nil {
-		return nil, fmt.Errorf("%v", err)
+		return Config{}, fmt.Errorf("%v", err)
 	}
 	defer configFile.Close()
 
-	var websites []Website
-	byteContent, err := ioutil.ReadAll(configFile)
+	configByteContent, err := ioutil.ReadAll(configFile)
 	if err != nil {
-		return nil, fmt.Errorf("%v", err)
+		return Config{}, err
 	}
 
-	json.Unmarshal(byteContent, &websites)
+	var config Config
 
-	return websites, nil
+	if err := json.Unmarshal(configByteContent, &config); err != nil {
+		return Config{}, err
+	}
+
+	return config, nil
 }
 
 func runMonitor(websites []Website) error {
