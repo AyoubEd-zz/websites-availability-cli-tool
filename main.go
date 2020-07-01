@@ -9,9 +9,9 @@ import (
 
 	"github.com/ayoubed/datadog-home-project/database"
 	"github.com/ayoubed/datadog-home-project/request"
-	"github.com/ayoubed/datadog-home-project/statsagent"
 )
 
+// Config struct containing websites config(url, check interval), database data(host, dbaname, username, password)
 type Config struct {
 	Websites []Website     `json:"websites"`
 	Database database.Type `json:"database"`
@@ -74,7 +74,7 @@ func runMonitor(websites []Website) error {
 	logc := make(chan request.ResponseLog)
 	defer close(done)
 
-	go statsagent.ProcessLogs(logc, errc)
+	go processLogs(logc, errc)
 
 	for _, ws := range websites {
 		go startTicker(ws, logc, done, errc)
@@ -90,6 +90,12 @@ func runMonitor(websites []Website) error {
 		}
 	}
 
+}
+
+func processLogs(logc chan request.ResponseLog, errc chan error) {
+	for log := range logc {
+		database.WriteLogToDB(log)
+	}
 }
 
 func startTicker(website Website, logc chan request.ResponseLog, done chan bool, errc chan error) {
