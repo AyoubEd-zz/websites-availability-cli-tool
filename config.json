@@ -20,6 +20,14 @@
   },
   "websites": [
     {
+      "url": "http://argos.co.uk",
+      "checkInterval": 2000
+    },
+    {
+      "url": "https://github.com",
+      "checkInterval": 3000
+    },
+    {
       "url": "https://google.com",
       "checkInterval": 4000
     },
