@@ -7,14 +7,16 @@ import (
 	"os"
 	"time"
 
+	"github.com/ayoubed/datadog-home-project/dashboard"
 	"github.com/ayoubed/datadog-home-project/database"
 	"github.com/ayoubed/datadog-home-project/request"
-	"github.com/ayoubed/datadog-home-project/statsagent"
 )
 
+// Config struct containing websites config(url, check interval), database data(host, dbaname, username, password)
 type Config struct {
-	Websites []Website     `json:"websites"`
-	Database database.Type `json:"database"`
+	Websites  []Website        `json:"websites"`
+	Database  database.Type    `json:"database"`
+	Dashboard []dashboard.View `json:"dashboard"`
 }
 
 // Website representes the entities we want to monitor
@@ -37,8 +39,7 @@ func main() {
 		websiteList = append(websiteList, ws.URL)
 	}
 
-	go database.ReadLogsPeriodically(websiteList, 10, 60)
-	go database.ReadLogsPeriodically(websiteList, 60, 3600)
+	go dashboard.Run(websiteList, config.Dashboard)
 
 	if err := runMonitor(config.Websites); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
@@ -74,7 +75,7 @@ func runMonitor(websites []Website) error {
 	logc := make(chan request.ResponseLog)
 	defer close(done)
 
-	go statsagent.ProcessLogs(logc, errc)
+	go processLogs(logc, errc)
 
 	for _, ws := range websites {
 		go startTicker(ws, logc, done, errc)
@@ -90,6 +91,12 @@ func runMonitor(websites []Website) error {
 		}
 	}
 
+}
+
+func processLogs(logc chan request.ResponseLog, errc chan error) {
+	for log := range logc {
+		database.WriteLogToDB(log)
+	}
 }
 
 func startTicker(website Website, logc chan request.ResponseLog, done chan bool, errc chan error) {

@@ -1,6 +1,7 @@
 package request
 
 import (
+	"log"
 	"net/http"
 	"net/http/httptrace"
 
@@ -14,6 +15,7 @@ type ResponseLog struct {
 	URL        string
 	TTFB       time.Duration
 	LoadTime   time.Duration
+	Success    bool
 }
 
 // Send performs a request to the given URL
@@ -27,6 +29,7 @@ func Send(t time.Time, url string, logc chan ResponseLog) error {
 	if err != nil {
 		return err
 	}
+	client := &http.Client{}
 
 	trace := &httptrace.ClientTrace{
 		GotFirstResponseByte: func() {
@@ -36,11 +39,15 @@ func Send(t time.Time, url string, logc chan ResponseLog) error {
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 	start = time.Now()
 
-	resp, err := http.DefaultTransport.RoundTrip(req)
+	resp, err := client.Do(req)
 	if err != nil {
-		logc <- ResponseLog{t, 400, url, ttfb, time.Since(start)}
+		log.Panic(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		logc <- ResponseLog{t, resp.StatusCode, url, ttfb, time.Since(start), false}
 	} else {
-		logc <- ResponseLog{t, resp.StatusCode, url, ttfb, time.Since(start)}
+		logc <- ResponseLog{t, resp.StatusCode, url, ttfb, time.Since(start), true}
 	}
 
 	return nil

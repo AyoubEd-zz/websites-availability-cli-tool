@@ -3,7 +3,6 @@ package database
 import (
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/ayoubed/datadog-home-project/request"
 	"github.com/influxdata/influxdb/client/v2"
@@ -40,21 +39,11 @@ func WriteLogToDB(responseLog request.ResponseLog) {
 	go dbName.AddResponseLog(responseLog)
 }
 
-// ReadLogsPeriodically reads logs from the database
-func ReadLogsPeriodically(urls []string, interval, span int) {
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
-
-	for {
-		select {
-		case t := <-ticker.C:
-			fmt.Printf("[%vs stats] ------------------%v------------------\n", interval, t)
-			for _, url := range urls {
-				fmt.Printf("> %v\n", url)
-				res := dbName.GetRangeRecords(url, span)
-				for _, line := range res {
-					fmt.Printf("%+v\n", line)
-				}
-			}
-		}
+// ReadLogsForRange reads logs from the database
+func ReadLogsForRange(urls []string, span int) map[string][]request.ResponseLog {
+	logsForURL := make(map[string][]request.ResponseLog)
+	for _, url := range urls {
+		logsForURL[url] = dbName.GetRangeRecords(url, span)
 	}
+	return logsForURL
 }
