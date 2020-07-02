@@ -1,4 +1,14 @@
 {
+  "dashboard": [
+    {
+      "updateInterval": 10,
+      "timeFrame": 60
+    },
+    {
+      "updateInterval": 60,
+      "timeFrame": 3600
+    }
+  ],
   "database": {
     "influxDb": {
       "host": "localhost",
@@ -10,7 +20,7 @@
   },
   "websites": [
     {
-      "url": "https://google.com/",
+      "url": "https://google.com",
       "checkInterval": 4000
     },
     {

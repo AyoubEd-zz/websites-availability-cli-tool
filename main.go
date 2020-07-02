@@ -14,8 +14,9 @@ import (
 
 // Config struct containing websites config(url, check interval), database data(host, dbaname, username, password)
 type Config struct {
-	Websites []Website     `json:"websites"`
-	Database database.Type `json:"database"`
+	Websites  []Website        `json:"websites"`
+	Database  database.Type    `json:"database"`
+	Dashboard []dashboard.View `json:"dashboard"`
 }
 
 // Website representes the entities we want to monitor
@@ -38,7 +39,7 @@ func main() {
 		websiteList = append(websiteList, ws.URL)
 	}
 
-	dashboard.Run(websiteList, 10, 60)
+	go dashboard.Run(websiteList, config.Dashboard)
 
 	if err := runMonitor(config.Websites); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
