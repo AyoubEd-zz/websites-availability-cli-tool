@@ -51,9 +51,6 @@ func Run(urls []string, views []View) {
 
 	g.SetManagerFunc(layout(g, views))
 
-	fmt.Println()
-	fmt.Println()
-
 	for index := range views {
 		go func(currentIndex int, currentView *View) {
 			ticker := time.NewTicker(time.Duration(currentView.UpdateInterval) * time.Second)
@@ -72,14 +69,14 @@ func Run(urls []string, views []View) {
 						v.SelFgColor = gocui.ColorBlack
 						v.Wrap = true
 						v.Clear()
-						fmt.Fprintln(v, fmt.Sprintf("%-30v %25v %25v %+v\n", "Website", "Average Response Time", "Max Response Time", "Status Codes"))
+						fmt.Fprintln(v, fmt.Sprintf("%-30v %25v %25v %25v %25v %+v\n", "Website", "Average Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
 						for k, value := range res {
 							statusCodeSlice := make([]string, 0)
 							for code, count := range value.StatusCodeCount {
 								statusCodeSlice = append(statusCodeSlice, fmt.Sprintf("%v:%v", code, count))
 							}
 							statusCodeStr := fmt.Sprintf("(%v)", strings.Join(statusCodeSlice, " "))
-							fmt.Fprintln(v, fmt.Sprintf("%-30v %25v %25v %-25v\n", k, value.AvgResponseTime, value.MaxResponseTime, statusCodeStr))
+							fmt.Fprintln(v, fmt.Sprintf("%-30v %25v %25v %25v %25v %-25v\n", k, value.AvgResponseTime, value.MaxResponseTime, value.AvgTimeToFirstByte, value.MaxTimeToFirstByte, statusCodeStr))
 						}
 						return nil
 					})
