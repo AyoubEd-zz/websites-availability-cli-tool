@@ -13,6 +13,7 @@ type WebsiteStats struct {
 	MaxResponseTime    time.Duration
 	AvgTimeToFirstByte time.Duration
 	MaxTimeToFirstByte time.Duration
+	Availability       float64
 }
 
 // GetStats of provided websites for a particualr span
@@ -28,8 +29,13 @@ func GetStats(urls []string, span int) map[string]WebsiteStats {
 		var sumTimeToFirstByte int64 = 0
 		var maxTimeToFirstByte time.Duration = 0
 		var avgTimeToFirstByte float64 = 0
+		var successCount float64 = 0
+		var availability float64 = 0
 
 		for _, line := range v {
+			if line.Success {
+				successCount++
+			}
 			if _, ok := statusCodeCount[line.StatusCode]; ok {
 				statusCodeCount[line.StatusCode]++
 			} else {
@@ -47,8 +53,9 @@ func GetStats(urls []string, span int) map[string]WebsiteStats {
 		if len(v) > 0 {
 			avgResponseTime = float64(sumResponseTime) / float64(len(v))
 			avgTimeToFirstByte = float64(sumTimeToFirstByte) / float64(len(v))
+			availability = successCount / float64(len(v))
 		}
-		websitesStats[k] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte}
+		websitesStats[k] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
 	}
 	return websitesStats
 }
