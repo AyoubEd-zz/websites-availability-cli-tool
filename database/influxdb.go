@@ -78,6 +78,7 @@ func (influxDb InfluxDb) AddResponseLog(responseLog request.ResponseLog) error {
 		"responseTime":    responseLog.LoadTime,
 		"timeToFirstByte": responseLog.TTFB,
 		"StatusCode":      responseLog.StatusCode,
+		"Success":         responseLog.Success,
 	}
 
 	bps, err := client.NewBatchPoints(client.BatchPointsConfig{
@@ -128,10 +129,11 @@ func (influxDb InfluxDb) GetRangeRecords(url string, span int) []request.Respons
 		for _, val := range result.Series[0].Values {
 			timestamp, _ := time.Parse(layout, val[0].(string))
 			statusCode, _ := val[1].(json.Number).Int64()
-			url := val[2].(string)
-			responseTime, _ := s2dParser.Str2Duration(val[3].(string))
-			timeToFirstByte, _ := s2dParser.Str2Duration(val[4].(string))
-			item := request.ResponseLog{Timestamp: timestamp, StatusCode: int(statusCode), URL: url, TTFB: timeToFirstByte, LoadTime: responseTime}
+			success := val[2].(bool)
+			url := val[3].(string)
+			responseTime, _ := s2dParser.Str2Duration(val[4].(string))
+			timeToFirstByte, _ := s2dParser.Str2Duration(val[5].(string))
+			item := request.ResponseLog{Timestamp: timestamp, StatusCode: int(statusCode), URL: url, TTFB: timeToFirstByte, LoadTime: responseTime, Success: success}
 			resSeries = append(resSeries, item)
 		}
 	}
