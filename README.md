@@ -115,3 +115,4 @@ ps: the alerting ticker interval should be reasonnably small to keep accuracy, b
 - **Stats:** We recompute the stats each time we get stats. A possible improvement is keeping a queue of all relevent measurements, and compute that stats in rolling manner.
 - **Alerts:** we keep all of our alerts messages in memory. In a production environment it makes sense to use a caching service like Redis or Memcached.
 - **Logging:** all of our alert messages should be logged for historic purposes. It also makes sense to store stats over some indicative timeframes(day stats, week stats, month stats)
+- **Installation and deployments**: we should containerize our application to make it easier for people to use and possibly deploy our tool and different environment
