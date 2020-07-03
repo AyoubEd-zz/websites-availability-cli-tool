@@ -1,7 +1,4 @@
-# datadog-home-project
-
-Website availability &amp; performance monitoring tool
-Alert# Website availability &amp; performance monitoring tool
+# Website availability &amp; performance monitoring tool
 
 _Overview_
 
@@ -29,6 +26,7 @@ _Dashboard_
 
 - [InfluxDB 2.0](https://www.influxdata.com/) - open source time series database
 - [Go 1.14](https://golang.org/) - a systems programming language
+- [Docker]() - we will use to ease up running an InfluxDB instance
 
 ### Installation
 
@@ -52,38 +50,68 @@ Run your build file:
 $ ./datadog-home-project
 ```
 
-### Docker compose
+### Testing
 
-Dillinger is very easy to install and deploy in a Docker container.
+We provided tests for the alerting process. The Go Testing package was used for this purpose.
+The 5 scenarios were tested:
 
-By default, the Docker will expose port 8080, so change this within the Dockerfile if necessary. When ready, simply use the Dockerfile to build the image.
+    0: got 0 records
+    Expected: don't send a "wesbite down" alert
+
+    1: We don't have enough records on the last timeframe, availability <= threshold
+    Expected: don't send a "wesbite down" alert
+
+    2: We have enough records on the last timeframe, availability > threshold, website state is up
+    Expected: don't send a "wesbite up" alert
+
+    3: We have enough records on the last timeframe, availability <= threshold, website state is up
+    Expected: send a "wesbite down" alert
+
+    4: We have enough records on the last timeframe, availability <= threshold, website state is down
+    Expected: dont't send a "wesbite down" alert
+
+    5: We have enough records on the last timeframe, availability > threshold, website state is down
+    Expected: send a "wesbite up" alert
+
+To run the test suite, execute the following:
 
 ```sh
-cd dillinger
-docker build -t joemccann/dillinger:${package.json.version} .
+$ go test -v ./...
 ```
 
-This will create the dillinger image and pull in the necessary dependencies. Be sure to swap out `${package.json.version}` with the actual version of Dillinger.
+### Implementation details
 
-Once done, run the Docker image and map the port to whatever you wish on your host. In this example, we simply map port 8000 of the host to port 8080 of the Docker (or whatever port was exposed in the Dockerfile):
+The project relies heavily on the built in concurrency features of Go. All of the following entities are run concurrently using goroutines. All communications are done through go channels, particularly the monitor logs and alerts channel.
 
-```sh
-docker run -d -p 8000:8080 --restart="always" <youruser>/dillinger:${package.json.version}
-```
+All the error management and propagation os done using the excellent "errgroup" package that facilitates managing errors while spanning multiple goroutines.
 
-Verify the deployment by navigating to your server address in your preferred browser.
+**Monitor**
 
-```sh
-127.0.0.1:8000
-```
+The monitor starts concurrent tickers linked to each website. Following a user defined interval, it sends a request to the website measures a few interesting metrics(response time, time to first byte), and sends the results as a measurement to our logs channel.
+
+**Database**
+
+Responsible for storing the meaurments we provide in in a time based manner. It facilitates getting measurements for a particular timeframe.
+
+**Statsagent**
+
+Called by other entities. It computes the stats(avg/max response time, avg/max time to first byte) for the websites we mointor. It also computes the availability of a website of a website over a timeframe.
+
+**Dashboard**
+
+displays stats about the websites we monitor with user-defined configs(update interval, stats timeframe). It starts concurrent tickers for each view that call statsagent to get the new metrics.
+
+the dashboard also listens to the alerts channel and displays new and past alerts on the GUI.
+
+**Alerting**
+
+Starts a ticker with a user-defined interval that calls statsgent to compute the availability for a user-defined timeframe. All alerts are sent to an alerts channel that is consummed by our dashboard.
+
+ps: the alerting ticker interval should be reasonnably small to keep accuracy, but not the extent of overloading the database. Using a ticker was a simplification I chose, in a production environment maybe we can rely on a pub/sub approach to reduce the overload, which InfluxDB supports.
 
 ### Possible improvements
 
-- Write MORE Tests
-- Add Night Mode
-
-## License
-
-MIT
-
-**Free Software, Hell Yeah!**
+- **Achitectre**: In a production environment it makes sense to split the different entities we mentionned to seperate microservices. The real-time communication should then be swaped to account for the change, we can maybe use gRPC streaming or websockets, or maybe we can use a message broker.
+- **Stats:** We recompute the stats each time we get stats. A possible improvement is keeping a queue of all relevent measurements, and compute that stats in rolling manner.
+- **Alerts:** we keep all of our alerts messages in memory. In a production environment it makes sense to use a caching service like Redis or Memcached.
+- **Logging:** all of our alert messages should be logged for historic purposes. It also makes sense to store stats over some indicative timeframes(day stats, week stats, month stats)
