@@ -112,16 +112,18 @@ func (influxDb InfluxDb) AddResponseLog(responseLog request.ResponseLog) error {
 	return nil
 }
 
-// GetRangeRecords gets the records for a particular range
-func (influxDb InfluxDb) GetRangeRecords(url string, span int) []request.ResponseLog {
-	q := fmt.Sprintf(`select * from "%s" WHERE time >= now() - %dm`, url, span/60)
+// GetRecordsForURL sends a query to InfluxDB
+// to get records of a given URL, older than a given "origin" and restricted by a given timeframe
+func (influxDb InfluxDb) GetRecordsForURL(url string, origin time.Time, timeframe int64) []request.ResponseLog {
+	q := fmt.Sprintf(`select * from "%s" WHERE time >= '%v' - %dm`, url, origin.Format(time.RFC3339), timeframe/60)
 	res, err := queryDB(q, influxDb.DatabaseName)
 	if err != nil {
 		log.Printf("%v", err)
 	}
+
 	s2dParser := str2duration.NewStr2DurationParser()
 
-	resSeries := make([]request.ResponseLog, 0)
+	records := make([]request.ResponseLog, 0)
 	for _, result := range res {
 		if len(result.Series) == 0 {
 			continue
@@ -134,10 +136,10 @@ func (influxDb InfluxDb) GetRangeRecords(url string, span int) []request.Respons
 			responseTime, _ := s2dParser.Str2Duration(val[4].(string))
 			timeToFirstByte, _ := s2dParser.Str2Duration(val[5].(string))
 			item := request.ResponseLog{Timestamp: timestamp, StatusCode: int(statusCode), URL: url, TTFB: timeToFirstByte, LoadTime: responseTime, Success: success}
-			resSeries = append(resSeries, item)
+			records = append(records, item)
 		}
 	}
-	return resSeries
+	return records
 }
 
 func createDatabase(databaseName string) error {

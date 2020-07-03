@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ayoubed/datadog-home-project/request"
 	"github.com/influxdata/influxdb/client/v2"
@@ -39,11 +40,12 @@ func WriteLogToDB(responseLog request.ResponseLog) {
 	go dbName.AddResponseLog(responseLog)
 }
 
-// ReadLogsForRange reads logs from the database
-func ReadLogsForRange(urls []string, span int) map[string][]request.ResponseLog {
-	logsForURL := make(map[string][]request.ResponseLog)
+// GetRecordsForURLs gets records from the database for all the given URLs
+// the records timestamp is bounded between and [origin - timeframe, origin]
+func GetRecordsForURLs(urls []string, origin time.Time, timeframe int64) map[string][]request.ResponseLog {
+	recordsForURL := make(map[string][]request.ResponseLog)
 	for _, url := range urls {
-		logsForURL[url] = dbName.GetRangeRecords(url, span)
+		recordsForURL[url] = dbName.GetRecordsForURL(url, origin, timeframe)
 	}
-	return logsForURL
+	return recordsForURL
 }

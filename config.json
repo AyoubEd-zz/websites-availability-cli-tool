@@ -20,24 +20,17 @@
   },
   "websites": [
     {
-      "url": "http://argos.co.uk",
-      "checkInterval": 2000
+      "url": "https://twitter.com",
+      "checkInterval": 2
     },
     {
-      "url": "https://github.com",
-      "checkInterval": 3000
-    },
-    {
-      "url": "https://google.com",
-      "checkInterval": 4000
-    },
-    {
-      "url": "https://wwww.reddit.com",
-      "checkInterval": 9000
-    },
-    {
-      "url": "https://wwww.facebook.com",
-      "checkInterval": 19000
+      "url": "https://reddit.com",
+      "checkInterval": 4
     }
-  ]
+  ],
+  "alerting": {
+    "availabilityInterval": 120,
+    "availabilityThreshold": 0.8,
+    "checkInterval": 5
+  }
 }

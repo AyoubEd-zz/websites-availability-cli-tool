@@ -1,7 +1,7 @@
 package request
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"net/http/httptrace"
 
@@ -29,7 +29,9 @@ func Send(t time.Time, url string, logc chan ResponseLog) error {
 	if err != nil {
 		return err
 	}
-	client := &http.Client{}
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 
 	trace := &httptrace.ClientTrace{
 		GotFirstResponseByte: func() {
@@ -41,9 +43,11 @@ func Send(t time.Time, url string, logc chan ResponseLog) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Panic(err)
+		fmt.Printf("%+v", err)
+		return err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		logc <- ResponseLog{t, resp.StatusCode, url, ttfb, time.Since(start), false}
 	} else {

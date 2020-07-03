@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ayoubed/datadog-home-project/alerting"
 	"github.com/ayoubed/datadog-home-project/dashboard"
 	"github.com/ayoubed/datadog-home-project/database"
 	"github.com/ayoubed/datadog-home-project/request"
@@ -14,9 +15,10 @@ import (
 
 // Config struct containing websites config(url, check interval), database data(host, dbaname, username, password)
 type Config struct {
-	Websites  []Website        `json:"websites"`
-	Database  database.Type    `json:"database"`
-	Dashboard []dashboard.View `json:"dashboard"`
+	Websites  []Website            `json:"websites"`
+	Database  database.Type        `json:"database"`
+	Dashboard []dashboard.View     `json:"dashboard"`
+	Alert     alerting.AlertConfig `json:"alerting"`
 }
 
 // Website representes the entities we want to monitor
@@ -35,11 +37,15 @@ func main() {
 	database.Set(config.Database)
 
 	websiteList := []string{}
+	websiteMap := make(map[string]int64)
 	for _, ws := range config.Websites {
 		websiteList = append(websiteList, ws.URL)
+		websiteMap[ws.URL] = int64(ws.CheckInterval)
 	}
 
-	go dashboard.Run(websiteList, config.Dashboard)
+	alertc := make(chan string)
+	go dashboard.Run(websiteList, config.Dashboard, alertc)
+	go alerting.Run(alertc, websiteMap, config.Alert)
 
 	if err := runMonitor(config.Websites); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
@@ -100,7 +106,7 @@ func processLogs(logc chan request.ResponseLog, errc chan error) {
 }
 
 func startTicker(website Website, logc chan request.ResponseLog, done chan bool, errc chan error) {
-	ticker := time.NewTicker(time.Duration(website.CheckInterval) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(website.CheckInterval) * time.Second)
 	for {
 		select {
 		case <-done:
