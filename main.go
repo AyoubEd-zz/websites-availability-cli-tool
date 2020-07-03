@@ -15,9 +15,10 @@ import (
 
 // Config struct containing websites config(url, check interval), database data(host, dbaname, username, password)
 type Config struct {
-	Websites  []Website        `json:"websites"`
-	Database  database.Type    `json:"database"`
-	Dashboard []dashboard.View `json:"dashboard"`
+	Websites  []Website            `json:"websites"`
+	Database  database.Type        `json:"database"`
+	Dashboard []dashboard.View     `json:"dashboard"`
+	Alert     alerting.AlertConfig `json:"alerting"`
 }
 
 // Website representes the entities we want to monitor
@@ -42,8 +43,9 @@ func main() {
 		websiteMap[ws.URL] = int64(ws.CheckInterval)
 	}
 
-	go dashboard.Run(websiteList, config.Dashboard)
-	go alerting.Run(websiteMap, 0.8)
+	alertc := make(chan string)
+	go dashboard.Run(websiteList, config.Dashboard, alertc)
+	go alerting.Run(alertc, websiteMap, config.Alert)
 
 	if err := runMonitor(config.Websites); err != nil {
 		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
@@ -104,7 +106,7 @@ func processLogs(logc chan request.ResponseLog, errc chan error) {
 }
 
 func startTicker(website Website, logc chan request.ResponseLog, done chan bool, errc chan error) {
-	ticker := time.NewTicker(time.Duration(website.CheckInterval) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(website.CheckInterval) * time.Second)
 	for {
 		select {
 		case <-done:

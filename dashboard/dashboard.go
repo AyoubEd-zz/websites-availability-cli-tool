@@ -13,16 +13,14 @@ import (
 )
 
 var alerts []string
-var RED *color.Color = color.New(color.FgRed)
-var GREEN *color.Color = color.New(color.FgGreen)
 
 type View struct {
-	UpdateInterval int `json:"updateInterval"`
-	TimeFrame      int `json:"timeFrame"`
+	UpdateInterval int   `json:"updateInterval"`
+	TimeFrame      int64 `json:"timeFrame"`
 }
 
 // Run displays the statistics in terminal
-func Run(urls []string, views []View) {
+func Run(urls []string, views []View, alertc chan string) {
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		log.Panicln(err)
@@ -32,6 +30,13 @@ func Run(urls []string, views []View) {
 	g.SetManagerFunc(layout(g, views))
 
 	updateViews(views, g, urls)
+
+	go func() {
+		for alertMessage := range alertc {
+			alerts = append(alerts, alertMessage)
+			updateAlertView(g)
+		}
+	}()
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
 		log.Panicln(err)
@@ -65,10 +70,10 @@ func updateViews(views []View, g *gocui.Gui, urls []string) {
 			ticker := time.NewTicker(time.Duration(currentView.UpdateInterval) * time.Second)
 			for {
 				select {
-				case <-ticker.C:
-					res := statsagent.GetStats(urls, currentView.TimeFrame)
+				case t := <-ticker.C:
+					res := statsagent.GetStats(urls, t, currentView.TimeFrame)
 					g.Update(func(g *gocui.Gui) error {
-						v, err := g.View(strconv.Itoa(currentView.TimeFrame))
+						v, err := g.View(strconv.Itoa(int(currentView.TimeFrame)))
 						if err != nil {
 							return err
 						}
@@ -92,29 +97,6 @@ func updateViews(views []View, g *gocui.Gui, urls []string) {
 			}
 		}(index, &views[index])
 	}
-
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		for {
-			select {
-			case <-ticker.C:
-				updateAlertView(g)
-			}
-		}
-	}()
-}
-
-// Alert adds a new alert to our log of alerts
-func Alert(t time.Time, url string, availability float64, up bool, start time.Time) {
-	var alertMessage string
-
-	if up {
-		alertMessage = GREEN.Sprintf("Website %v is up. availability=%v, time=%s\n", url, availability, t.Format(time.RFC1123))
-	} else {
-		alertMessage = RED.Sprintf("Website %v is down. availability=%v, time=%s\n", url, availability, t.Format(time.RFC1123))
-	}
-
-	alerts = append(alerts, alertMessage)
 }
 
 func updateAlertView(g *gocui.Gui) {
@@ -138,7 +120,7 @@ func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {
 	return func(g *gocui.Gui) error {
 		// Set stats views
 		for index, view := range views {
-			v, err := g.SetView(strconv.Itoa(view.TimeFrame), 0, index*(maxY/3), maxX, (index+1)*(maxY/3))
+			v, err := g.SetView(strconv.Itoa(int(view.TimeFrame)), 0, index*(maxY/3), maxX, (index+1)*(maxY/3))
 			v.FgColor = gocui.ColorCyan
 			if err != nil {
 				if err != gocui.ErrUnknownView {
@@ -146,7 +128,7 @@ func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {
 				}
 
 				loadingMessage := color.New(color.FgMagenta)
-				loadingMessage.Fprintln(v, fmt.Sprintf("\n\n%v One moment, we're gathering the statistics for the last %vs...", "⌛ ", view.TimeFrame))
+				loadingMessage.Fprintln(v, fmt.Sprintf("\n\n%v One moment, we're waiting for statistics for the last %vs...", "⌛ ", view.TimeFrame))
 			}
 			v.Title = fmt.Sprintf(" Statistics for the last %vs (updated every %vs) ", view.TimeFrame, view.UpdateInterval)
 			v.Wrap = true

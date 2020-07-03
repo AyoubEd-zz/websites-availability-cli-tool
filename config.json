@@ -21,11 +21,16 @@
   "websites": [
     {
       "url": "https://twitter.com",
-      "checkInterval": 2000
+      "checkInterval": 2
     },
     {
       "url": "https://reddit.com",
-      "checkInterval": 4000
+      "checkInterval": 4
     }
-  ]
+  ],
+  "alerting": {
+    "availabilityInterval": 120,
+    "availabilityThreshold": 0.8,
+    "checkInterval": 5
+  }
 }

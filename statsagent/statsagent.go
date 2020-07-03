@@ -17,9 +17,9 @@ type WebsiteStats struct {
 	Availability       float64
 }
 
-// GetStats of provided websites for a particualr span
-func GetStats(urls []string, span int) map[string]WebsiteStats {
-	res := database.ReadLogsForRange(urls, span)
+// GetStats of provided websites for a particular timeframe
+func GetStats(urls []string, origin time.Time, timeframe int64) map[string]WebsiteStats {
+	res := database.GetRecordsForURLs(urls, origin, timeframe)
 	websitesStats := make(map[string]WebsiteStats)
 
 	for k, v := range res {
@@ -67,13 +67,14 @@ type AvailabilityRange struct {
 	Records      []request.ResponseLog
 }
 
-// GetRangeAvailability : get availability for a particular timeframe
-func GetRangeAvailability(urls []string, t time.Time, timeframe int) map[string]AvailabilityRange {
-	var start time.Time = time.Now()
-	res := database.ReadLogsForRange2(urls, t, timeframe)
+// GetAvailabilityForTimeFrame computes the availability of a slice URLs
+// given a time origin and a timeframe
+func GetAvailabilityForTimeFrame(urls []string, origin time.Time, timeframe int64) map[string]AvailabilityRange {
+	var start time.Time = origin
+	recordsForURLs := database.GetRecordsForURLs(urls, origin, timeframe)
 	websitesAvailability := make(map[string]AvailabilityRange)
 
-	for k, v := range res {
+	for k, v := range recordsForURLs {
 		var successCount float64 = 0
 		var availability float64 = 0
 
