@@ -40,12 +40,8 @@ func WriteLogToDB(responseLog request.ResponseLog) {
 	go dbName.AddResponseLog(responseLog)
 }
 
-// GetRecordsForURLs gets records from the database for all the given URLs
+// GetRecordsForURL gets records from the database for all the given URLs
 // the records timestamp is bounded between and [origin - timeframe, origin]
-func GetRecordsForURLs(urls []string, origin time.Time, timeframe int64) map[string][]request.ResponseLog {
-	recordsForURL := make(map[string][]request.ResponseLog)
-	for _, url := range urls {
-		recordsForURL[url] = dbName.GetRecordsForURL(url, origin, timeframe)
-	}
-	return recordsForURL
+func GetRecordsForURL(url string, origin time.Time, timeframe int64) []request.ResponseLog {
+	return dbName.GetRecordsForURL(url, origin, timeframe)
 }

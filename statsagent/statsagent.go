@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/ayoubed/datadog-home-project/database"
-	"github.com/ayoubed/datadog-home-project/request"
 )
 
 // WebsiteStats contains useful metrics about website
@@ -19,10 +18,10 @@ type WebsiteStats struct {
 
 // GetStats of provided websites for a particular timeframe
 func GetStats(urls []string, origin time.Time, timeframe int64) map[string]WebsiteStats {
-	res := database.GetRecordsForURLs(urls, origin, timeframe)
 	websitesStats := make(map[string]WebsiteStats)
 
-	for k, v := range res {
+	for _, url := range urls {
+		v := database.GetRecordsForURL(url, origin, timeframe)
 		statusCodeCount := make(map[int]int)
 		var sumResponseTime int64 = 0
 		var maxResponseTime time.Duration = 0
@@ -56,7 +55,7 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 			avgTimeToFirstByte = float64(sumTimeToFirstByte) / float64(len(v))
 			availability = successCount / float64(len(v))
 		}
-		websitesStats[k] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
+		websitesStats[url] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
 	}
 	return websitesStats
 }
@@ -64,31 +63,26 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 type AvailabilityRange struct {
 	Availability float64
 	Start        time.Time
-	Records      []request.ResponseLog
 }
 
-// GetAvailabilityForTimeFrame computes the availability of a slice URLs
+// GetAvailabilityForTimeFrame computes the availability of a Website
 // given a time origin and a timeframe
-func GetAvailabilityForTimeFrame(urls []string, origin time.Time, timeframe int64) map[string]AvailabilityRange {
+func GetAvailabilityForTimeFrame(url string, origin time.Time, timeframe int64) AvailabilityRange {
 	var start time.Time = origin
-	recordsForURLs := database.GetRecordsForURLs(urls, origin, timeframe)
-	websitesAvailability := make(map[string]AvailabilityRange)
+	records := database.GetRecordsForURL(url, origin, timeframe)
 
-	for k, v := range recordsForURLs {
-		var successCount float64 = 0
-		var availability float64 = 0
+	var successCount float64 = 0
+	var availability float64 = 0
 
-		for _, line := range v {
-			if line.Success {
-				successCount++
-			}
+	for _, line := range records {
+		if line.Success {
+			successCount++
 		}
-
-		if len(v) > 0 {
-			availability = successCount / float64(len(v))
-			start = v[0].Timestamp
-		}
-		websitesAvailability[k] = AvailabilityRange{Availability: availability, Start: start, Records: v}
 	}
-	return websitesAvailability
+
+	if len(records) > 0 {
+		availability = successCount / float64(len(records))
+		start = records[0].Timestamp
+	}
+	return AvailabilityRange{Availability: availability, Start: start}
 }
