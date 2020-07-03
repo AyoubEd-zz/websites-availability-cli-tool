@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ayoubed/datadog-home-project/database"
+	"github.com/ayoubed/datadog-home-project/request"
 )
 
 // WebsiteStats contains useful metrics about website
@@ -68,9 +69,12 @@ type AvailabilityRange struct {
 // GetAvailabilityForTimeFrame computes the availability of a Website
 // given a time origin and a timeframe
 func GetAvailabilityForTimeFrame(url string, origin time.Time, timeframe int64) AvailabilityRange {
-	var start time.Time = origin
 	records := database.GetRecordsForURL(url, origin, timeframe)
+	return GetAvailabilityForRecords(records, origin)
+}
 
+func GetAvailabilityForRecords(records []request.ResponseLog, origin time.Time) AvailabilityRange {
+	var start time.Time = origin
 	var successCount float64 = 0
 	var availability float64 = 0
 
