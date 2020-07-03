@@ -30,8 +30,10 @@ func Run(ctx context.Context, urls []string, views []View, alertc chan string, d
 	}
 	defer g.Close()
 
+	// set the layout of the GUI
 	g.SetManagerFunc(layout(g, views))
 
+	// launch goroutines to continuously update our views
 	errg, gctx := errgroup.WithContext(ctx)
 
 	for _, view := range views {
@@ -45,6 +47,23 @@ func Run(ctx context.Context, urls []string, views []View, alertc chan string, d
 		return monitorAlertChan(gctx, g, alertc)
 	})
 
+	// Set key bindings for the GUI
+	if err := initKeybindings(g, done); err != nil {
+		return err
+	}
+
+	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
+		return fmt.Errorf("error while executing the dashboards main loop: %v", err)
+	}
+
+	if err := errg.Wait(); err != nil {
+		return fmt.Errorf("dashboard process error: %v", err)
+	}
+
+	return nil
+}
+
+func initKeybindings(g *gocui.Gui, done context.CancelFunc) error {
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone,
 		func(g *gocui.Gui, v *gocui.View) error {
 			done()
@@ -68,15 +87,6 @@ func Run(ctx context.Context, urls []string, views []View, alertc chan string, d
 
 		log.Panicln(err)
 	}
-
-	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-		return fmt.Errorf("error while executing the dashboards main loop: %v", err)
-	}
-
-	if err := errg.Wait(); err != nil {
-		return fmt.Errorf("dashboard process error: %v", err)
-	}
-
 	return nil
 }
 
@@ -89,10 +99,13 @@ func updateView(ctx context.Context, currentView View, g *gocui.Gui, urls []stri
 			ticker.Stop()
 			return nil
 		case t := <-ticker.C:
+			// Grab the latest stats over the given timeframe
 			res, err := statsagent.GetStats(urls, t, currentView.TimeFrame)
 			if err != nil {
 				return fmt.Errorf("error while getting stats to update view: %v", err)
 			}
+
+			// update the GUI with the latest stats
 			g.Update(func(g *gocui.Gui) error {
 				v, err := g.View(strconv.Itoa(int(currentView.TimeFrame)))
 				if err != nil {
@@ -100,6 +113,7 @@ func updateView(ctx context.Context, currentView View, g *gocui.Gui, urls []stri
 				}
 				v.Clear()
 
+				// pretty print the stats to our view
 				header := color.New(color.FgYellow, color.Bold)
 				header.Fprintln(v, fmt.Sprintf("%-30v %21v %21v %21v %21v %21v %25v\n", "Website", "Availability", "Avg Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
 
@@ -154,8 +168,9 @@ func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {
 	maxX, maxY := g.Size()
 	return func(g *gocui.Gui) error {
 		// Set stats views
+		numViews := len(views) + 1 // number of views, plus the alert channel
 		for index, view := range views {
-			v, err := g.SetView(strconv.Itoa(int(view.TimeFrame)), 0, index*(maxY/3), maxX, (index+1)*(maxY/3))
+			v, err := g.SetView(strconv.Itoa(int(view.TimeFrame)), 0, index*(maxY/numViews), maxX, (index+1)*(maxY/numViews))
 			v.FgColor = gocui.ColorCyan
 			if err != nil {
 				if err != gocui.ErrUnknownView {
@@ -170,7 +185,7 @@ func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {
 		}
 
 		// Set alerts view
-		v, err := g.SetView("alerts", 0, 2*(maxY/3), maxX, maxY)
+		v, err := g.SetView("alerts", 0, (numViews-1)*(maxY/numViews), maxX, maxY)
 		v.FgColor = gocui.ColorCyan
 		if err != nil {
 			if err != gocui.ErrUnknownView {
