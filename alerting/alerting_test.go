@@ -141,7 +141,7 @@ func TestAlertLogic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			availability := statsagent.GetAvailabilityForRecords(tt.records, tt.origin)
-			alertMessage := getMessage(tt.origin, tt.URL, tt.websitestateUp, 1, availability, alertConfig)
+			alertMessage := getAlertMessage(tt.origin, tt.URL, tt.websitestateUp, 1, availability, alertConfig)
 
 			if !reflect.DeepEqual(alertMessage, tt.expectedAlertMessage) {
 				t.Errorf("Got %v, want %v", alertMessage, tt.expectedAlertMessage)
