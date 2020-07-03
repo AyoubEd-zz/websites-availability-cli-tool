@@ -10,6 +10,7 @@ import (
 var red *color.Color = color.New(color.FgRed)
 var green *color.Color = color.New(color.FgGreen)
 
+// websiteUp is a map that keeps track of the state of each website we're monitoring
 var websiteUp map[string]bool = make(map[string]bool)
 
 // AlertConfig represents all the useful info for our alert logic
@@ -23,7 +24,6 @@ type AlertConfig struct {
 // It send an alert to the dashboard, if the availability of some website over a given interval
 // is bellow the given the threshold
 func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConfig) {
-	// every 5 seconds check the availablity of websites
 	urls := make([]string, 0)
 	for k := range websitesMap {
 		websiteUp[k] = true
@@ -34,8 +34,8 @@ func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConf
 	for {
 		select {
 		case t := <-ticker.C:
-			res := statsagent.GetAvailabilityForTimeFrame(urls, t, alertConfig.AvailabilityInterval)
-			for url, v := range res {
+			for _, url := range urls {
+				v := statsagent.GetAvailabilityForTimeFrame(url, t, alertConfig.AvailabilityInterval)
 				var tm int64 = (v.Start.Unix() - (t.Unix() - alertConfig.AvailabilityInterval))
 
 				if tm >= 0 && tm <= websitesMap[url] && (v.Availability <= alertConfig.AvailabilityThreshold && websiteUp[url] == true) || (v.Availability > alertConfig.AvailabilityThreshold && websiteUp[url] == false) {
