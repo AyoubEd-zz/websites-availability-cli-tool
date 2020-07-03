@@ -36,21 +36,28 @@ func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConf
 		case t := <-ticker.C:
 			for _, url := range urls {
 				v := statsagent.GetAvailabilityForTimeFrame(url, t, alertConfig.AvailabilityInterval)
-				var tm int64 = (v.Start.Unix() - (t.Unix() - alertConfig.AvailabilityInterval))
-
-				if tm >= 0 && tm <= websitesMap[url] && (v.Availability <= alertConfig.AvailabilityThreshold && websiteUp[url] == true) || (v.Availability > alertConfig.AvailabilityThreshold && websiteUp[url] == false) {
-					var alertMessage string
-
-					if v.Availability > alertConfig.AvailabilityThreshold {
-						alertMessage = green.Sprintf("Website %v is up. availability = %.2f%%, time = %s\n", url, 100*v.Availability, t.Format(time.RFC1123))
-					} else {
-						alertMessage = red.Sprintf("Website %v is down. availability = %.2f%%, time = %s\n", url, 100*v.Availability, t.Format(time.RFC1123))
-					}
-
-					alertc <- alertMessage
-					websiteUp[url] = v.Availability > alertConfig.AvailabilityThreshold
+				result := getMessage(t, url, websiteUp[url], websitesMap[url], v, alertConfig)
+				if result != "" {
+					alertc <- result
 				}
 			}
 		}
 	}
+}
+
+func getMessage(t time.Time, url string, up bool, websiteCheckInterval int64, v statsagent.AvailabilityRange, alertConfig AlertConfig) string {
+	var alertMessage string = ""
+	var tm int64 = (v.Start.Unix() - (t.Unix() - alertConfig.AvailabilityInterval))
+
+	if tm >= 0 && tm <= websiteCheckInterval && (v.Availability <= alertConfig.AvailabilityThreshold && up == true) || (v.Availability > alertConfig.AvailabilityThreshold && up == false) {
+
+		if v.Availability > alertConfig.AvailabilityThreshold {
+			alertMessage = green.Sprintf("Website %v is up. availability = %.2f%%, time = %s\n", url, 100*v.Availability, t.Format(time.RFC1123))
+		} else {
+			alertMessage = red.Sprintf("Website %v is down. availability = %.2f%%, time = %s\n", url, 100*v.Availability, t.Format(time.RFC1123))
+		}
+
+		websiteUp[url] = v.Availability > alertConfig.AvailabilityThreshold
+	}
+	return alertMessage
 }
