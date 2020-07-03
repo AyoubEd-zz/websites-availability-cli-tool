@@ -36,7 +36,7 @@ func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConf
 		case t := <-ticker.C:
 			for _, url := range urls {
 				v := statsagent.GetAvailabilityForTimeFrame(url, t, alertConfig.AvailabilityInterval)
-				result := getMessage(t, url, websiteUp[url], websitesMap[url], v, alertConfig)
+				result := getAlertMessage(t, url, websiteUp[url], websitesMap[url], v, alertConfig)
 				if result != "" {
 					alertc <- result
 				}
@@ -45,7 +45,7 @@ func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConf
 	}
 }
 
-func getMessage(t time.Time, url string, up bool, websiteCheckInterval int64, v statsagent.AvailabilityRange, alertConfig AlertConfig) string {
+func getAlertMessage(t time.Time, url string, up bool, websiteCheckInterval int64, v statsagent.AvailabilityRange, alertConfig AlertConfig) string {
 	var alertMessage string = ""
 	var tm int64 = (v.Start.Unix() - (t.Unix() - alertConfig.AvailabilityInterval))
 
