@@ -1,6 +1,7 @@
 package statsagent
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/ayoubed/datadog-home-project/database"
@@ -18,11 +19,14 @@ type WebsiteStats struct {
 }
 
 // GetStats of provided websites for a particular timeframe
-func GetStats(urls []string, origin time.Time, timeframe int64) map[string]WebsiteStats {
+func GetStats(urls []string, origin time.Time, timeframe int64) (map[string]WebsiteStats, error) {
 	websitesStats := make(map[string]WebsiteStats)
 
 	for _, url := range urls {
-		v := database.GetRecordsForURL(url, origin, timeframe)
+		records, err := database.GetRecordsForURL(url, origin, timeframe)
+		if err != nil {
+			return nil, err
+		}
 		statusCodeCount := make(map[string]int)
 		var sumResponseTime int64 = 0
 		var maxResponseTime time.Duration = 0
@@ -33,7 +37,7 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 		var successCount float64 = 0
 		var availability float64 = 0
 
-		for _, line := range v {
+		for _, line := range records {
 			if _, ok := statusCodeCount[line.StatusCode]; ok {
 				statusCodeCount[line.StatusCode]++
 			} else {
@@ -55,11 +59,11 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 		if successCount > 0 {
 			avgResponseTime = float64(sumResponseTime) / float64(successCount)
 			avgTimeToFirstByte = float64(sumTimeToFirstByte) / float64(successCount)
-			availability = successCount / float64(len(v))
+			availability = successCount / float64(len(records))
 		}
 		websitesStats[url] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
 	}
-	return websitesStats
+	return websitesStats, nil
 }
 
 type AvailabilityRange struct {
@@ -69,9 +73,12 @@ type AvailabilityRange struct {
 
 // GetAvailabilityForTimeFrame computes the availability of a Website
 // given a time origin and a timeframe
-func GetAvailabilityForTimeFrame(url string, origin time.Time, timeframe int64) AvailabilityRange {
-	records := database.GetRecordsForURL(url, origin, timeframe)
-	return GetAvailabilityForRecords(records, origin)
+func GetAvailabilityForTimeFrame(url string, origin time.Time, timeframe int64) (AvailabilityRange, error) {
+	records, err := database.GetRecordsForURL(url, origin, timeframe)
+	if err != nil {
+		return AvailabilityRange{}, fmt.Errorf("error while calculating availabililty for %v: %v", url, err)
+	}
+	return GetAvailabilityForRecords(records, origin), nil
 }
 
 // GetAvailabilityForRecords returns the availability given a slice of records

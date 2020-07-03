@@ -2,7 +2,6 @@ package database
 
 import (
 	"fmt"
-	"log"
 	"net/url"
 	"time"
 
@@ -108,11 +107,11 @@ func (influxDb InfluxDb) AddRecord(responseLog request.ResponseLog) error {
 
 // GetRecordsForURL sends a query to InfluxDB
 // to get records of a given URL, older than a given "origin" and restricted by a given timeframe
-func (influxDb InfluxDb) GetRecordsForURL(url string, origin time.Time, timeframe int64) []request.ResponseLog {
+func (influxDb InfluxDb) GetRecordsForURL(url string, origin time.Time, timeframe int64) ([]request.ResponseLog, error) {
 	q := fmt.Sprintf(`select * from "%s" WHERE time >= '%v' - %dm`, url, origin.Format(time.RFC3339), timeframe/60)
 	res, err := queryDB(q, influxDb.DatabaseName)
 	if err != nil {
-		log.Printf("%v", err)
+		return nil, fmt.Errorf("error executing query %v", err)
 	}
 
 	s2dParser := str2duration.NewStr2DurationParser()
@@ -123,17 +122,26 @@ func (influxDb InfluxDb) GetRecordsForURL(url string, origin time.Time, timefram
 			continue
 		}
 		for _, val := range result.Series[0].Values {
-			timestamp, _ := time.Parse(layout, val[0].(string))
-			statusCode, _ := val[1].(string)
+			timestamp, err := time.Parse(layout, val[0].(string))
+			if err != nil {
+				return nil, fmt.Errorf("error parsing time %v:\n %v", val[0], err)
+			}
+			statusCode := val[1].(string)
 			success := val[2].(bool)
 			url := val[3].(string)
-			responseTime, _ := s2dParser.Str2Duration(val[4].(string))
-			timeToFirstByte, _ := s2dParser.Str2Duration(val[5].(string))
+			responseTime, err := s2dParser.Str2Duration(val[4].(string))
+			if err != nil {
+				return nil, fmt.Errorf("error parsing response time %v:\n %v", val[4], err)
+			}
+			timeToFirstByte, err := s2dParser.Str2Duration(val[5].(string))
+			if err != nil {
+				return nil, fmt.Errorf("error parsing time to first byte %v:\n %v", val[5], err)
+			}
 			item := request.ResponseLog{Timestamp: timestamp, StatusCode: statusCode, URL: url, TTFB: timeToFirstByte, LoadTime: responseTime, Success: success}
 			records = append(records, item)
 		}
 	}
-	return records
+	return records, nil
 }
 
 func createDatabase(databaseName string) error {

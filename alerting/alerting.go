@@ -1,6 +1,8 @@
 package alerting
 
 import (
+	"context"
+	"fmt"
 	"time"
 
 	"github.com/ayoubed/datadog-home-project/statsagent"
@@ -23,7 +25,7 @@ type AlertConfig struct {
 // Run monitors the availability of websites
 // It send an alert to the dashboard, if the availability of some website over a given interval
 // is bellow the given the threshold
-func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConfig) {
+func Run(ctx context.Context, alertc chan string, websitesMap map[string]int64, alertConfig AlertConfig) error {
 	urls := make([]string, 0)
 	for k := range websitesMap {
 		websiteUp[k] = true
@@ -33,9 +35,16 @@ func Run(alertc chan string, websitesMap map[string]int64, alertConfig AlertConf
 
 	for {
 		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			return nil
 		case t := <-ticker.C:
 			for _, url := range urls {
-				v := statsagent.GetAvailabilityForTimeFrame(url, t, alertConfig.AvailabilityInterval)
+				v, err := statsagent.GetAvailabilityForTimeFrame(url, t, alertConfig.AvailabilityInterval)
+				if err != nil {
+					return fmt.Errorf("error while executing the alert process: %v", err)
+				}
+
 				result := getAlertMessage(t, url, websiteUp[url], websitesMap[url], v, alertConfig)
 				if result != "" {
 					alertc <- result

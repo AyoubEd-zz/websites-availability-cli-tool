@@ -45,14 +45,17 @@ func main() {
 	ctx, done := context.WithCancel(context.Background())
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Start goroutines to ping websites
 	logc := make(chan request.ResponseLog)
 	alertc := make(chan string)
 	defer close(logc)
 	defer close(alertc)
 
-	go dashboard.Run(websiteList, config.Dashboard, alertc, done)
-	go alerting.Run(alertc, websiteMap, config.Alert)
+	g.Go(func() error {
+		return dashboard.Run(gctx, websiteList, config.Dashboard, alertc, done)
+	})
+	g.Go(func() error {
+		return alerting.Run(gctx, alertc, websiteMap, config.Alert)
+	})
 
 	g.Go(func() error {
 		return monitor.ProcessLogs(gctx, logc)
@@ -70,10 +73,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// if err := monitor.Run(config.Websites, logc, errc, done); err != nil {
-	// 	fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
-	// 	os.Exit(1)
-	// }
 }
 
 func getConfig() (Config, error) {
