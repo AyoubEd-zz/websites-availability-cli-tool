@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ayoubed/datadog-home-project/database"
+	"github.com/ayoubed/datadog-home-project/request"
 )
 
 // WebsiteStats contains useful metrics about website
@@ -58,4 +59,35 @@ func GetStats(urls []string, span int) map[string]WebsiteStats {
 		websitesStats[k] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
 	}
 	return websitesStats
+}
+
+type AvailabilityRange struct {
+	Availability float64
+	Start        time.Time
+	Records      []request.ResponseLog
+}
+
+// GetRangeAvailability : get availability for a particular timeframe
+func GetRangeAvailability(urls []string, t time.Time, timeframe int) map[string]AvailabilityRange {
+	var start time.Time = time.Now()
+	res := database.ReadLogsForRange2(urls, t, timeframe)
+	websitesAvailability := make(map[string]AvailabilityRange)
+
+	for k, v := range res {
+		var successCount float64 = 0
+		var availability float64 = 0
+
+		for _, line := range v {
+			if line.Success {
+				successCount++
+			}
+		}
+
+		if len(v) > 0 {
+			availability = successCount / float64(len(v))
+			start = v[0].Timestamp
+		}
+		websitesAvailability[k] = AvailabilityRange{Availability: availability, Start: start, Records: v}
+	}
+	return websitesAvailability
 }

@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/ayoubed/datadog-home-project/request"
 	"github.com/influxdata/influxdb/client/v2"
@@ -44,6 +45,14 @@ func ReadLogsForRange(urls []string, span int) map[string][]request.ResponseLog 
 	logsForURL := make(map[string][]request.ResponseLog)
 	for _, url := range urls {
 		logsForURL[url] = dbName.GetRangeRecords(url, span)
+	}
+	return logsForURL
+}
+
+func ReadLogsForRange2(urls []string, t time.Time, span int) map[string][]request.ResponseLog {
+	logsForURL := make(map[string][]request.ResponseLog)
+	for _, url := range urls {
+		logsForURL[url] = dbName.GetRangeRecords2(url, t, span)
 	}
 	return logsForURL
 }

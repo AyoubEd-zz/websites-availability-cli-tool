@@ -119,6 +119,35 @@ func (influxDb InfluxDb) GetRangeRecords(url string, span int) []request.Respons
 	if err != nil {
 		log.Printf("%v", err)
 	}
+
+	s2dParser := str2duration.NewStr2DurationParser()
+
+	resSeries := make([]request.ResponseLog, 0)
+	for _, result := range res {
+		if len(result.Series) == 0 {
+			continue
+		}
+		for _, val := range result.Series[0].Values {
+			timestamp, _ := time.Parse(layout, val[0].(string))
+			statusCode, _ := val[1].(json.Number).Int64()
+			success := val[2].(bool)
+			url := val[3].(string)
+			responseTime, _ := s2dParser.Str2Duration(val[4].(string))
+			timeToFirstByte, _ := s2dParser.Str2Duration(val[5].(string))
+			item := request.ResponseLog{Timestamp: timestamp, StatusCode: int(statusCode), URL: url, TTFB: timeToFirstByte, LoadTime: responseTime, Success: success}
+			resSeries = append(resSeries, item)
+		}
+	}
+	return resSeries
+}
+
+func (influxDb InfluxDb) GetRangeRecords2(url string, timestamp time.Time, span int) []request.ResponseLog {
+	q := fmt.Sprintf(`select * from "%s" WHERE time >= '%v' - %dm`, url, timestamp.Format(time.RFC3339), span/60)
+	res, err := queryDB(q, influxDb.DatabaseName)
+	if err != nil {
+		log.Printf("%v", err)
+	}
+
 	s2dParser := str2duration.NewStr2DurationParser()
 
 	resSeries := make([]request.ResponseLog, 0)
