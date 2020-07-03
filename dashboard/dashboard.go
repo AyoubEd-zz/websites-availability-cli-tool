@@ -11,40 +11,46 @@ import (
 	"github.com/ayoubed/datadog-home-project/statsagent"
 	"github.com/fatih/color"
 	"github.com/jroimartin/gocui"
+	"golang.org/x/sync/errgroup"
 )
 
-var alerts []string
-
+// View represents one entity on the Gui
+// views display stats for a user-defined timeframe
+// they are updated following a user-defined interval
 type View struct {
 	UpdateInterval int   `json:"updateInterval"`
 	TimeFrame      int64 `json:"timeFrame"`
 }
 
-// Run displays the statistics in terminal
-func Run(urls []string, views []View, alertc chan string, done context.CancelFunc) {
+// Run displays the statistics, and alerts in our terminal
+func Run(ctx context.Context, urls []string, views []View, alertc chan string, done context.CancelFunc) error {
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
-		log.Panicln(err)
+		return fmt.Errorf("error creating GUI: %v", err)
 	}
 	defer g.Close()
 
 	g.SetManagerFunc(layout(g, views))
 
-	updateViews(views, g, urls)
+	errg, gctx := errgroup.WithContext(ctx)
 
-	go func() {
-		for alertMessage := range alertc {
-			alerts = append(alerts, alertMessage)
-			updateAlertView(g)
-		}
-	}()
+	for _, view := range views {
+		view := view
+		errg.Go(func() error {
+			return updateView(gctx, view, g, urls)
+		})
+	}
+
+	errg.Go(func() error {
+		return monitorAlertChan(gctx, g, alertc)
+	})
 
 	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone,
 		func(g *gocui.Gui, v *gocui.View) error {
 			done()
 			return quit(g, v)
 		}); err != nil {
-		log.Panicln(err)
+		return fmt.Errorf("error while trying to close our GUI: %v", err)
 	}
 	if err := g.SetKeybinding("stdin", gocui.KeyArrowUp, gocui.ModNone,
 		func(g *gocui.Gui, v *gocui.View) error {
@@ -64,47 +70,70 @@ func Run(urls []string, views []View, alertc chan string, done context.CancelFun
 	}
 
 	if err := g.MainLoop(); err != nil && err != gocui.ErrQuit {
-		log.Panicln(err)
+		return fmt.Errorf("error while executing the dashboards main loop: %v", err)
 	}
+
+	if err := errg.Wait(); err != nil {
+		return fmt.Errorf("dashboard process error: %v", err)
+	}
+
+	return nil
 }
 
-func updateViews(views []View, g *gocui.Gui, urls []string) {
+func updateView(ctx context.Context, currentView View, g *gocui.Gui, urls []string) error {
 
-	for index := range views {
-		go func(currentIndex int, currentView *View) {
-			ticker := time.NewTicker(time.Duration(currentView.UpdateInterval) * time.Second)
-			for {
-				select {
-				case t := <-ticker.C:
-					res := statsagent.GetStats(urls, t, currentView.TimeFrame)
-					g.Update(func(g *gocui.Gui) error {
-						v, err := g.View(strconv.Itoa(int(currentView.TimeFrame)))
-						if err != nil {
-							return err
-						}
-						v.Clear()
-
-						header := color.New(color.FgYellow, color.Bold)
-						header.Fprintln(v, fmt.Sprintf("%-30v %21v %21v %21v %21v %21v %25v\n", "Website", "Availability", "Avg Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
-
-						for _, url := range urls {
-							value := res[url]
-							statusCodeSlice := make([]string, 0)
-							for code, count := range value.StatusCodeCount {
-								statusCodeSlice = append(statusCodeSlice, fmt.Sprintf("%v:%v", code, count))
-							}
-							statusCodeStr := fmt.Sprintf("[%v]", strings.Join(statusCodeSlice, " "))
-							fmt.Fprintln(v, fmt.Sprintf("%-30v %20.2f%% %21v %21v %21v %21v %25v", url, 100*value.Availability, value.AvgResponseTime, value.MaxResponseTime, value.AvgTimeToFirstByte, value.MaxTimeToFirstByte, statusCodeStr))
-						}
-						return nil
-					})
-				}
+	ticker := time.NewTicker(time.Duration(currentView.UpdateInterval) * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			return nil
+		case t := <-ticker.C:
+			res, err := statsagent.GetStats(urls, t, currentView.TimeFrame)
+			if err != nil {
+				return fmt.Errorf("error while getting stats to update view: %v", err)
 			}
-		}(index, &views[index])
+			g.Update(func(g *gocui.Gui) error {
+				v, err := g.View(strconv.Itoa(int(currentView.TimeFrame)))
+				if err != nil {
+					return fmt.Errorf("error getting view in update function: %v", err)
+				}
+				v.Clear()
+
+				header := color.New(color.FgYellow, color.Bold)
+				header.Fprintln(v, fmt.Sprintf("%-30v %21v %21v %21v %21v %21v %25v\n", "Website", "Availability", "Avg Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
+
+				for _, url := range urls {
+					value := res[url]
+					statusCodeSlice := make([]string, 0)
+					for code, count := range value.StatusCodeCount {
+						statusCodeSlice = append(statusCodeSlice, fmt.Sprintf("%v:%v", code, count))
+					}
+					statusCodeStr := fmt.Sprintf("[%v]", strings.Join(statusCodeSlice, " "))
+					fmt.Fprintln(v, fmt.Sprintf("%-30v %20.2f%% %21v %21v %21v %21v %25v", url, 100*value.Availability, value.AvgResponseTime, value.MaxResponseTime, value.AvgTimeToFirstByte, value.MaxTimeToFirstByte, statusCodeStr))
+				}
+				return nil
+			})
+		}
 	}
 }
 
-func updateAlertView(g *gocui.Gui) {
+func monitorAlertChan(ctx context.Context, g *gocui.Gui, alertc chan string) error {
+	var alerts []string
+	for {
+		select {
+		case alertMessage := <-alertc:
+			alerts = append(alerts, alertMessage)
+			if err := updateAlertView(g, alerts); err != nil {
+				return fmt.Errorf("error while updating the alert view: %v", err)
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+func updateAlertView(g *gocui.Gui, alerts []string) error {
 
 	g.Update(func(g *gocui.Gui) error {
 		v, err := g.View("alerts")
@@ -118,6 +147,7 @@ func updateAlertView(g *gocui.Gui) {
 		}
 		return nil
 	})
+	return nil
 }
 
 func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {

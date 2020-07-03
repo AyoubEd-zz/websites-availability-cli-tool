@@ -45,13 +45,14 @@ func main() {
 	ctx, done := context.WithCancel(context.Background())
 	g, gctx := errgroup.WithContext(ctx)
 
-	// Start goroutines to ping websites
 	logc := make(chan request.ResponseLog)
 	alertc := make(chan string)
 	defer close(logc)
 	defer close(alertc)
 
-	go dashboard.Run(websiteList, config.Dashboard, alertc, done)
+	g.Go(func() error {
+		return dashboard.Run(gctx, websiteList, config.Dashboard, alertc, done)
+	})
 	g.Go(func() error {
 		return alerting.Run(gctx, alertc, websiteMap, config.Alert)
 	})

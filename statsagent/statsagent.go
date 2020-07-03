@@ -19,13 +19,13 @@ type WebsiteStats struct {
 }
 
 // GetStats of provided websites for a particular timeframe
-func GetStats(urls []string, origin time.Time, timeframe int64) map[string]WebsiteStats {
+func GetStats(urls []string, origin time.Time, timeframe int64) (map[string]WebsiteStats, error) {
 	websitesStats := make(map[string]WebsiteStats)
 
 	for _, url := range urls {
 		records, err := database.GetRecordsForURL(url, origin, timeframe)
 		if err != nil {
-			// todo
+			return nil, err
 		}
 		statusCodeCount := make(map[string]int)
 		var sumResponseTime int64 = 0
@@ -63,7 +63,7 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 		}
 		websitesStats[url] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
 	}
-	return websitesStats
+	return websitesStats, nil
 }
 
 type AvailabilityRange struct {
