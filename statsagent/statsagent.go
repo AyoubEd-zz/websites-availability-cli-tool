@@ -9,7 +9,7 @@ import (
 
 // WebsiteStats contains useful metrics about website
 type WebsiteStats struct {
-	StatusCodeCount    map[int]int
+	StatusCodeCount    map[string]int
 	AvgResponseTime    time.Duration
 	MaxResponseTime    time.Duration
 	AvgTimeToFirstByte time.Duration
@@ -23,7 +23,7 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 
 	for _, url := range urls {
 		v := database.GetRecordsForURL(url, origin, timeframe)
-		statusCodeCount := make(map[int]int)
+		statusCodeCount := make(map[string]int)
 		var sumResponseTime int64 = 0
 		var maxResponseTime time.Duration = 0
 		var avgResponseTime float64 = 0
@@ -34,26 +34,27 @@ func GetStats(urls []string, origin time.Time, timeframe int64) map[string]Websi
 		var availability float64 = 0
 
 		for _, line := range v {
-			if line.Success {
-				successCount++
-			}
 			if _, ok := statusCodeCount[line.StatusCode]; ok {
 				statusCodeCount[line.StatusCode]++
 			} else {
 				statusCodeCount[line.StatusCode] = 1
 			}
-			if line.LoadTime > maxResponseTime {
-				maxResponseTime = line.LoadTime
+
+			if line.Success {
+				successCount++
+				if line.LoadTime > maxResponseTime {
+					maxResponseTime = line.LoadTime
+				}
+				if line.TTFB > maxTimeToFirstByte {
+					maxTimeToFirstByte = line.TTFB
+				}
+				sumResponseTime += int64(line.LoadTime)
+				sumTimeToFirstByte += int64(line.TTFB)
 			}
-			if line.TTFB > maxTimeToFirstByte {
-				maxTimeToFirstByte = line.TTFB
-			}
-			sumResponseTime += int64(line.LoadTime)
-			sumTimeToFirstByte += int64(line.TTFB)
 		}
-		if len(v) > 0 {
-			avgResponseTime = float64(sumResponseTime) / float64(len(v))
-			avgTimeToFirstByte = float64(sumTimeToFirstByte) / float64(len(v))
+		if successCount > 0 {
+			avgResponseTime = float64(sumResponseTime) / float64(successCount)
+			avgTimeToFirstByte = float64(sumTimeToFirstByte) / float64(successCount)
 			availability = successCount / float64(len(v))
 		}
 		websitesStats[url] = WebsiteStats{StatusCodeCount: statusCodeCount, AvgResponseTime: time.Duration(avgResponseTime), MaxResponseTime: maxResponseTime, AvgTimeToFirstByte: time.Duration(avgTimeToFirstByte), MaxTimeToFirstByte: maxTimeToFirstByte, Availability: availability}
@@ -73,6 +74,7 @@ func GetAvailabilityForTimeFrame(url string, origin time.Time, timeframe int64) 
 	return GetAvailabilityForRecords(records, origin)
 }
 
+// GetAvailabilityForRecords returns the availability given a slice of records
 func GetAvailabilityForRecords(records []request.ResponseLog, origin time.Time) AvailabilityRange {
 	var start time.Time = origin
 	var successCount float64 = 0
@@ -84,7 +86,7 @@ func GetAvailabilityForRecords(records []request.ResponseLog, origin time.Time) 
 		}
 	}
 
-	if len(records) > 0 {
+	if successCount > 0 {
 		availability = successCount / float64(len(records))
 		start = records[0].Timestamp
 	}

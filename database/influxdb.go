@@ -1,7 +1,6 @@
 package database
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/url"
@@ -45,22 +44,19 @@ func (influxDb InfluxDb) Initialize() error {
 
 	influxDBcon, err = client.NewHTTPClient(conf)
 	if err != nil {
-		println("InfluxDB : Failed to connect to Database . Please check the details entered in the config file\nError Details: ", err.Error())
-		return err
+		return fmt.Errorf("error creating a client for InfluxDB: %v", err)
 	}
 
 	_, _, err = influxDBcon.Ping(10 * time.Second)
 	if err != nil {
-		println("InfluxDB : Failed to connect to Database . Please check the details entered in the config file\nError Details: ", err.Error())
-		return err
+		return fmt.Errorf("error while trying to ping InfluxDB: %v", err)
 	}
 
 	createDbErr := createDatabase(influxDb.DatabaseName)
 
 	if createDbErr != nil {
 		if createDbErr.Error() != "database already exists" {
-			println("InfluxDB : Failed to create Database")
-			return createDbErr
+			return fmt.Errorf("failed to create InfluxDB Database instance: %v", createDbErr)
 		}
 
 	}
@@ -68,8 +64,8 @@ func (influxDb InfluxDb) Initialize() error {
 	return nil
 }
 
-// AddResponseLog request information to database
-func (influxDb InfluxDb) AddResponseLog(responseLog request.ResponseLog) error {
+// AddRecord adds a new record to InfluxDB
+func (influxDb InfluxDb) AddRecord(responseLog request.ResponseLog) error {
 
 	tags := map[string]string{
 		"requestId": responseLog.URL,
@@ -96,7 +92,6 @@ func (influxDb InfluxDb) AddResponseLog(responseLog request.ResponseLog) error {
 		fields,
 		responseLog.Timestamp,
 	)
-
 	if err != nil {
 		return err
 	}
@@ -104,7 +99,6 @@ func (influxDb InfluxDb) AddResponseLog(responseLog request.ResponseLog) error {
 	bps.AddPoint(point)
 
 	err = influxDBcon.Write(bps)
-
 	if err != nil {
 		return err
 	}
@@ -130,12 +124,12 @@ func (influxDb InfluxDb) GetRecordsForURL(url string, origin time.Time, timefram
 		}
 		for _, val := range result.Series[0].Values {
 			timestamp, _ := time.Parse(layout, val[0].(string))
-			statusCode, _ := val[1].(json.Number).Int64()
+			statusCode, _ := val[1].(string)
 			success := val[2].(bool)
 			url := val[3].(string)
 			responseTime, _ := s2dParser.Str2Duration(val[4].(string))
 			timeToFirstByte, _ := s2dParser.Str2Duration(val[5].(string))
-			item := request.ResponseLog{Timestamp: timestamp, StatusCode: int(statusCode), URL: url, TTFB: timeToFirstByte, LoadTime: responseTime, Success: success}
+			item := request.ResponseLog{Timestamp: timestamp, StatusCode: statusCode, URL: url, TTFB: timeToFirstByte, LoadTime: responseTime, Success: success}
 			records = append(records, item)
 		}
 	}

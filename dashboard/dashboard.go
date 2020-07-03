@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"strconv"
@@ -20,7 +21,7 @@ type View struct {
 }
 
 // Run displays the statistics in terminal
-func Run(urls []string, views []View, alertc chan string) {
+func Run(urls []string, views []View, alertc chan string, done context.CancelFunc) {
 	g, err := gocui.NewGui(gocui.OutputNormal)
 	if err != nil {
 		log.Panicln(err)
@@ -38,7 +39,11 @@ func Run(urls []string, views []View, alertc chan string) {
 		}
 	}()
 
-	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone, quit); err != nil {
+	if err := g.SetKeybinding("", gocui.KeyCtrlC, gocui.ModNone,
+		func(g *gocui.Gui, v *gocui.View) error {
+			done()
+			return quit(g, v)
+		}); err != nil {
 		log.Panicln(err)
 	}
 	if err := g.SetKeybinding("stdin", gocui.KeyArrowUp, gocui.ModNone,
@@ -80,7 +85,7 @@ func updateViews(views []View, g *gocui.Gui, urls []string) {
 						v.Clear()
 
 						header := color.New(color.FgYellow, color.Bold)
-						header.Fprintln(v, fmt.Sprintf("%-30v %21v %21v %21v %21v %21v %25v\n", "Website", "Availability", "Average Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
+						header.Fprintln(v, fmt.Sprintf("%-30v %21v %21v %21v %21v %21v %25v\n", "Website", "Availability", "Avg Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
 
 						for _, url := range urls {
 							value := res[url]

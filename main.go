@@ -1,40 +1,39 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"time"
 
 	"github.com/ayoubed/datadog-home-project/alerting"
 	"github.com/ayoubed/datadog-home-project/dashboard"
 	"github.com/ayoubed/datadog-home-project/database"
+	"github.com/ayoubed/datadog-home-project/monitor"
 	"github.com/ayoubed/datadog-home-project/request"
+	"golang.org/x/sync/errgroup"
 )
 
 // Config struct containing websites config(url, check interval), database data(host, dbaname, username, password)
 type Config struct {
-	Websites  []Website            `json:"websites"`
+	Websites  []monitor.Website    `json:"websites"`
 	Database  database.Type        `json:"database"`
 	Dashboard []dashboard.View     `json:"dashboard"`
 	Alert     alerting.AlertConfig `json:"alerting"`
 }
 
-// Website representes the entities we want to monitor
-type Website struct {
-	URL           string `json:"url"`
-	CheckInterval int    `json:"checkInterval"`
-}
-
 func main() {
 	config, err := getConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error loading website config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
 	}
 
-	database.Set(config.Database)
+	if err := database.Set(config.Database); err != nil {
+		fmt.Fprintf(os.Stderr, "Error setting up the database: %v\n", err)
+		os.Exit(1)
+	}
 
 	websiteList := []string{}
 	websiteMap := make(map[string]int64)
@@ -43,14 +42,38 @@ func main() {
 		websiteMap[ws.URL] = int64(ws.CheckInterval)
 	}
 
+	ctx, done := context.WithCancel(context.Background())
+	g, gctx := errgroup.WithContext(ctx)
+
+	// Start goroutines to ping websites
+	logc := make(chan request.ResponseLog)
 	alertc := make(chan string)
-	go dashboard.Run(websiteList, config.Dashboard, alertc)
+	defer close(logc)
+	defer close(alertc)
+
+	go dashboard.Run(websiteList, config.Dashboard, alertc, done)
 	go alerting.Run(alertc, websiteMap, config.Alert)
 
-	if err := runMonitor(config.Websites); err != nil {
-		fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
+	g.Go(func() error {
+		return monitor.ProcessLogs(gctx, logc)
+	})
+
+	for _, ws := range config.Websites {
+		ws := ws
+		g.Go(func() error {
+			return monitor.StartWebsiteMonitor(gctx, ws, logc)
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
+
+	// if err := monitor.Run(config.Websites, logc, errc, done); err != nil {
+	// 	fmt.Fprintf(os.Stderr, "The website monitor encountered an error: %v\n", err)
+	// 	os.Exit(1)
+	// }
 }
 
 func getConfig() (Config, error) {
@@ -72,50 +95,4 @@ func getConfig() (Config, error) {
 	}
 
 	return config, nil
-}
-
-func runMonitor(websites []Website) error {
-	// Start goroutines to ping websites
-	done := make(chan bool, 1)
-	errc := make(chan error)
-	logc := make(chan request.ResponseLog)
-	defer close(done)
-
-	go processLogs(logc, errc)
-
-	for _, ws := range websites {
-		go startTicker(ws, logc, done, errc)
-	}
-
-	for {
-		select {
-		case err := <-errc:
-			return err
-		case <-done:
-			close(errc)
-			close(logc)
-		}
-	}
-
-}
-
-func processLogs(logc chan request.ResponseLog, errc chan error) {
-	for log := range logc {
-		database.WriteLogToDB(log)
-	}
-}
-
-func startTicker(website Website, logc chan request.ResponseLog, done chan bool, errc chan error) {
-	ticker := time.NewTicker(time.Duration(website.CheckInterval) * time.Second)
-	for {
-		select {
-		case <-done:
-			ticker.Stop()
-			return
-		case t := <-ticker.C:
-			if err := request.Send(t, website.URL, logc); err != nil {
-				errc <- err
-			}
-		}
-	}
 }

@@ -8,4 +8,5 @@ require (
 	github.com/jroimartin/gocui v0.4.0
 	github.com/nsf/termbox-go v0.0.0-20200418040025-38ba6e5628f1 // indirect
 	github.com/xhit/go-str2duration v1.0.1
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 )
