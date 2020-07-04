@@ -56,22 +56,22 @@ We provided tests for the alerting process. The Go Testing package was used for 
 The 5 scenarios were tested:
 
     0: got 0 records
-    Expected: don't send a "wesbite down" alert
+    Expected: don't send a "website down" alert
 
     1: We don't have enough records on the last timeframe, availability <= threshold
-    Expected: don't send a "wesbite down" alert
+    Expected: don't send a "website down" alert.
 
     2: We have enough records on the last timeframe, availability > threshold, website state is up
-    Expected: don't send a "wesbite up" alert
+    Expected: don't send a "website up" alert.
 
     3: We have enough records on the last timeframe, availability <= threshold, website state is up
-    Expected: send a "wesbite down" alert
+    Expected: send a "website down" alert.
 
     4: We have enough records on the last timeframe, availability <= threshold, website state is down
-    Expected: dont't send a "wesbite down" alert
+    Expected: don't send a "website down" alert.
 
     5: We have enough records on the last timeframe, availability > threshold, website state is down
-    Expected: send a "wesbite up" alert
+    Expected: send a "website up" alert.
 
 To run the test suite, execute the following:
 
@@ -81,38 +81,38 @@ $ go test -v ./...
 
 ### Implementation details
 
-The project relies heavily on the built in concurrency features of Go. All of the following entities are run concurrently using goroutines. All communications are done through go channels, particularly the monitor logs and alerts channel.
+The project relies heavily on the built-in concurrency features of Go. All of the following entities are run concurrently using goroutines. All communications are done through go channels, particularly the monitor logs and alerts channel.
 
-All the error management and propagation os done using the excellent "errgroup" package that facilitates managing errors while spanning multiple goroutines.
+All the error management and propagation are done using the excellent "errgroup" package that facilitates managing errors while spanning multiple goroutines.
 
 **Monitor**
 
-The monitor starts concurrent tickers linked to each website. Following a user defined interval, it sends a request to the website measures a few interesting metrics(response time, time to first byte), and sends the results as a measurement to our logs channel.
+The monitor starts concurrent tickers linked to each website. Following a user-defined interval, it sends a request to the website measures a few interesting metrics(response time, time to first byte), and sends the results as a measurement to our logs channel.
 
 **Database**
 
-Responsible for storing the meaurments we provide in in a time based manner. It facilitates getting measurements for a particular timeframe.
+Responsible for storing the measurements we provide in a time-based manner. It facilitates getting measurements for a particular timeframe.
 
 **Statsagent**
 
-Called by other entities. It computes the stats(avg/max response time, avg/max time to first byte) for the websites we mointor. It also computes the availability of a website of a website over a timeframe.
+Called by other entities. It computes the stats(avg/max response time, avg/max time to first byte) for the websites we monitor. It also computes the availability of a website over a timeframe.
 
 **Dashboard**
 
-displays stats about the websites we monitor with user-defined configs(update interval, stats timeframe). It starts concurrent tickers for each view that call statsagent to get the new metrics.
+Displays stats about the websites we monitor with user-defined configs(update interval, stats timeframe). It starts concurrent tickers for each view that call stats agent to get the new metrics.
 
-the dashboard also listens to the alerts channel and displays new and past alerts on the GUI.
+The dashboard also listens to the alerts channel and displays new and past alerts on the GUI.
 
 **Alerting**
 
-Starts a ticker with a user-defined interval that calls statsgent to compute the availability for a user-defined timeframe. All alerts are sent to an alerts channel that is consummed by our dashboard.
+It starts a ticker with a user-defined interval that calls the stats agent to compute the availability for a user-defined timeframe. All alerts are sent to an alerts channel that is consumed by our dashboard.
 
-ps: the alerting ticker interval should be reasonnably small to keep accuracy, but not the extent of overloading the database. Using a ticker was a simplification I chose, in a production environment maybe we can rely on a pub/sub approach to reduce the overload, which InfluxDB supports.
+Ps: the alerting ticker interval should be reasonably small to keep accuracy, but not the extent of overloading the database. Using a ticker was a simplification I chose. In a production environment, we may be able to rely on a pub/sub approach to reduce the overload, which InfluxDB supports.
 
 ### Possible improvements
 
-- **Achitectre**: In a production environment it makes sense to split the different entities we mentionned to seperate microservices. The real-time communication should then be swaped to account for the change, we can maybe use gRPC streaming or websockets, or maybe we can use a message broker.
-- **Stats:** We recompute the stats each time we get stats. A possible improvement is keeping a queue of all relevent measurements, and compute that stats in rolling manner.
-- **Alerts:** we keep all of our alerts messages in memory. In a production environment it makes sense to use a caching service like Redis or Memcached.
-- **Logging:** all of our alert messages should be logged for historic purposes. It also makes sense to store stats over some indicative timeframes(day stats, week stats, month stats)
+- **Architecture**: In a production environment, it makes sense to split the different entities we mentioned to separate microservices. The real-time communication should then be swapped to account for the change, we can maybe use gRPC streaming or WebSockets, or maybe we can use a message broker.
+- **Stats:** We recompute the stats each time we get stats. A possible improvement is keeping a queue of all relevant measurements and compute that stats in a rolling manner.
+- **Alerts:** we keep all of our alerts messages in memory. In a production environment, it makes sense to use a caching service like Redis or Memcached.
+- **Logging:** all of our alert messages should be logged for historical purposes. It also makes sense to store stats over some indicative timeframes(day stats, week stats, month stats)
 - **Installation and deployments**: we should containerize our application to make it easier for people to use and possibly deploy our tool and different environment
