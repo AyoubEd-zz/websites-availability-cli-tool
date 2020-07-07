@@ -47,5 +47,9 @@ func WriteLogToDB(responseLog request.ResponseLog) error {
 // GetRecordsForURL gets records from the database for all the given URLs
 // the records timestamp is bounded between and [origin - timeframe, origin]
 func GetRecordsForURL(url string, origin time.Time, timeframe int64) ([]request.ResponseLog, error) {
-	return dbName.GetRecordsForURL(url, origin, timeframe)
+	res, err := dbName.GetRecordsForURL(url, origin, timeframe)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
