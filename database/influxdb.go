@@ -161,7 +161,7 @@ func queryDB(cmd string, databaseName string) (res []client.Result, err error) {
 		return nil, err
 	}
 	if response.Error() != nil {
-		return res, response.Error()
+		return nil, response.Error()
 	}
 
 	return response.Results, nil
