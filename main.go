@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -24,7 +25,11 @@ type Config struct {
 }
 
 func main() {
-	config, err := getConfig()
+	var configFile = flag.String("config", "data/config.json", "JSON config file")
+	flag.Parse()
+
+	config, err := getConfig(*configFile)
+
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error loading config: %v\n", err)
 		os.Exit(1)
@@ -75,8 +80,8 @@ func main() {
 
 }
 
-func getConfig() (Config, error) {
-	configFile, err := os.Open("config.json")
+func getConfig(filepath string) (Config, error) {
+	configFile, err := os.Open(filepath)
 	if err != nil {
 		return Config{}, fmt.Errorf("%v", err)
 	}
