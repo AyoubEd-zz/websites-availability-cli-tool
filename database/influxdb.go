@@ -31,8 +31,7 @@ var (
 func (influxDb InfluxDb) Initialize() error {
 	u, err := url.Parse(fmt.Sprintf("http://%s:%d", influxDb.Host, influxDb.Port))
 	if err != nil {
-		println("InfluxDB : Invalid Url,Please check domain name given in config file \nError Details: ", err.Error())
-		return err
+		return fmt.Errorf("InfluxDB : Invalid Url,Please check domain name given in config file \nError Details: %v", err)
 	}
 
 	conf := client.HTTPConfig{
@@ -122,7 +121,7 @@ func (influxDb InfluxDb) GetRecordsForURL(url string, origin time.Time, timefram
 			continue
 		}
 		for _, val := range result.Series[0].Values {
-			timestamp, err := time.Parse(layout, val[0].(string))
+			timestamp, err := time.Parse(time.RFC3339, val[0].(string))
 			if err != nil {
 				return nil, fmt.Errorf("error parsing time %v:\n %v", val[0], err)
 			}
@@ -156,11 +155,14 @@ func queryDB(cmd string, databaseName string) (res []client.Result, err error) {
 		Command:  cmd,
 		Database: databaseName,
 	}
-	if response, err := influxDBcon.Query(q); err == nil {
-		if response.Error() != nil {
-			return res, response.Error()
-		}
-		res = response.Results
+
+	response, err := influxDBcon.Query(q)
+	if err != nil {
+		return nil, err
 	}
-	return
+	if response.Error() != nil {
+		return nil, response.Error()
+	}
+
+	return response.Results, nil
 }

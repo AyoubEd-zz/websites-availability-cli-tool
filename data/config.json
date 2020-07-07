@@ -21,7 +21,7 @@
   "websites": [
     {
       "url": "https://twitter.com",
-      "checkInterval": 2
+      "checkInterval": 6
     },
     {
       "url": "https://reddit.com",

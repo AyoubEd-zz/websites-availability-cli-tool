@@ -115,7 +115,7 @@ func updateView(ctx context.Context, currentView View, g *gocui.Gui, urls []stri
 
 				// pretty print the stats to our view
 				header := color.New(color.FgYellow, color.Bold)
-				header.Fprintln(v, fmt.Sprintf("%-30v %21v %21v %21v %21v %21v %25v\n", "Website", "Availability", "Avg Response Time", "Max Response Time", "Avg TTFB", "Max TTFB", "Status Codes"))
+				header.Fprintln(v, fmt.Sprintf("%-30v %12v %12v %12v %12v %12v %25v\n", "website", "availability", "avg rt", "max rt", "avg ttfb", "max ttfb", "status codes"))
 
 				for _, url := range urls {
 					value := res[url]
@@ -124,7 +124,7 @@ func updateView(ctx context.Context, currentView View, g *gocui.Gui, urls []stri
 						statusCodeSlice = append(statusCodeSlice, fmt.Sprintf("%v:%v", code, count))
 					}
 					statusCodeStr := fmt.Sprintf("[%v]", strings.Join(statusCodeSlice, " "))
-					fmt.Fprintln(v, fmt.Sprintf("%-30v %20.2f%% %21v %21v %21v %21v %25v", url, 100*value.Availability, value.AvgResponseTime, value.MaxResponseTime, value.AvgTimeToFirstByte, value.MaxTimeToFirstByte, statusCodeStr))
+					fmt.Fprintln(v, fmt.Sprintf("%-30v %11.2f%% %10.2fms %10.2fms %10.2fms %10.2fms %25v", url, 100*value.Availability, float64(value.AvgResponseTime)/float64(time.Millisecond), float64(value.MaxResponseTime)/float64(time.Millisecond), float64(value.AvgTimeToFirstByte)/float64(time.Millisecond), float64(value.MaxTimeToFirstByte)/float64(time.Millisecond), statusCodeStr))
 				}
 				return nil
 			})
@@ -171,7 +171,6 @@ func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {
 		numViews := len(views) + 1 // number of views, plus the alert channel
 		for index, view := range views {
 			v, err := g.SetView(strconv.Itoa(int(view.TimeFrame)), 0, index*(maxY/numViews), maxX, (index+1)*(maxY/numViews))
-			v.FgColor = gocui.ColorCyan
 			if err != nil {
 				if err != gocui.ErrUnknownView {
 					log.Panic("Error setting views")
@@ -180,18 +179,19 @@ func layout(g *gocui.Gui, views []View) func(*gocui.Gui) error {
 				loadingMessage := color.New(color.FgMagenta)
 				loadingMessage.Fprintln(v, fmt.Sprintf("\n\n%v One moment, we're waiting for statistics for the last %vs...", "⌛ ", view.TimeFrame))
 			}
+			v.FgColor = gocui.ColorCyan
 			v.Title = fmt.Sprintf(" Statistics for the last %vs (updated every %vs) ", view.TimeFrame, view.UpdateInterval)
 			v.Wrap = true
 		}
 
 		// Set alerts view
 		v, err := g.SetView("alerts", 0, (numViews-1)*(maxY/numViews), maxX, maxY)
-		v.FgColor = gocui.ColorCyan
 		if err != nil {
 			if err != gocui.ErrUnknownView {
 				log.Panic("Error setting views")
 			}
 		}
+		v.FgColor = gocui.ColorCyan
 		v.Title = fmt.Sprintf(" Alerts ")
 		v.Wrap = true
 		return nil
