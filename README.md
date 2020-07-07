@@ -32,6 +32,8 @@ _Dashboard_
 
 #### Building from source
 
+You can customize the update and check intervals in the config.json file at the root of the projects. Defaults are coherant with the assignment specifications.
+
 Build your Go app:
 
 ```sh
@@ -108,6 +110,12 @@ The dashboard also listens to the alerts channel and displays new and past alert
 It starts a ticker with a user-defined interval that calls the stats agent to compute the availability for a user-defined timeframe. All alerts are sent to an alerts channel that is consumed by our dashboard.
 
 Ps: the alerting ticker interval should be reasonably small to keep accuracy, but not the extent of overloading the database. Using a ticker was a simplification I chose. In a production environment, we may be able to rely on a pub/sub approach to reduce the overload, which InfluxDB supports.
+
+#### Architecture
+
+<p align="center">
+  <img src="architecture.png">
+</p>
 
 ### Possible improvements
 
