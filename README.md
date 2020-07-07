@@ -1,5 +1,9 @@
 # Website availability &amp; performance monitoring tool
 
+<p align="center">
+  <img src="misc/screenshot.png">
+</p>
+
 _Overview_
 
 - A console program to monitor the performance and availability of websites
@@ -112,7 +116,7 @@ It starts a ticker with a user-defined interval that calls the stats agent to co
 Ps: the alerting ticker interval should be reasonably small to keep accuracy, but not the extent of overloading the database. Using a ticker was a simplification I chose. In a production environment, we may be able to rely on a pub/sub approach to reduce the overload, which InfluxDB supports.
 
 <p align="center">
-  <img src="architecture.png">
+  <img src="misc/architecture.png">
 </p>
 
 ### Possible improvements
