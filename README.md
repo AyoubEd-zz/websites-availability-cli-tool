@@ -1,5 +1,7 @@
 # Website availability &amp; performance monitoring tool
 
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/24bb64ff722d40de8cda498683ab3171)](https://app.codacy.com/manual/AyoubEd/websites-availability-performance-monitoring-tool?utm_source=github.com&utm_medium=referral&utm_content=AyoubEd/websites-availability-performance-monitoring-tool&utm_campaign=Badge_Grade_Settings)
+
 <p align="center">
   <img src="misc/screenshot.png">
 </p>
