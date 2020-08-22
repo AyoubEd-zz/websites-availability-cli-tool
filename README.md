@@ -8,31 +8,31 @@
 
 _Overview_
 
-- A console program to monitor the performance and availability of websites
-- Websites and check intervals are user-defined
+-   A console program to monitor the performance and availability of websites
+-   Websites and check intervals are user-defined
 
 _Statistics_
 
-- Check the different websites with their corresponding check intervals
-- Compute a few interesting metrics: availability, max/avg response times, max/avg time to first byte, response codes count
+-   Check the different websites with their corresponding check intervals
+-   Compute a few interesting metrics: availability, max/avg response times, max/avg time to first byte, response codes count
 
 _Alerting_
 
-- When a website availability is below a user-defined threshold for a user-defined interval, an alert message is created: "Website {website} is down. availability={availability}, time={time}" (default config threshold: 80%, interval: 2min)
-- When availability resumes, another message is created detailing when the alert recovered
+-   When a website availability is below a user-defined threshold for a user-defined interval, an alert message is created: "Website {website} is down. availability={availability}, time={time}" (default config threshold: 80%, interval: 2min)
+-   When availability resumes, another message is created detailing when the alert recovered
 
 _Dashboard_
 
-- displays stats for a user-defined timeframe, stats are updated following a user-defined interval. Default:
-  - Every 10s, display the stats for the past 10 minutes for each website
-  - Every minute displays the stats for the past hour for each website
-- Show all past alerting messages
+-   displays stats for a user-defined timeframe, stats are updated following a user-defined interval. Default:
+    -   Every 10s, display the stats for the past 10 minutes for each website
+    -   Every minute displays the stats for the past hour for each website
+-   Show all past alerting messages
 
 ### Requirements
 
-- [InfluxDB 2.0](https://www.influxdata.com/) - open source time series database
-- [Go 1.14](https://golang.org/) - a systems programming language
-- [Docker]() - we will use to ease up running an InfluxDB instance
+-   [InfluxDB 2.0](https://www.influxdata.com/) - open source time series database
+-   [Go 1.14](https://golang.org/) - a systems programming language
+-   [Docker]() - we will use to ease up running an InfluxDB instance
 
 ### Installation
 
